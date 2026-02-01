@@ -6,6 +6,7 @@
 import { MoltbookClient, type Post, type Comment } from './moltbook.js';
 import { type AIProvider } from './ai-provider.js';
 import https from 'node:https';
+import http from 'node:http';
 
 export interface AgentConfig {
 	client: MoltbookClient;
@@ -24,14 +25,7 @@ async function sendTelegramNotification(title: string, content: string, postUrl:
 		return;
 	}
 
-	const message = `🦞 *小多发帖啦！*
-
-*标题:* ${escapeMarkdown(title)}
-
-*内容:*
-${escapeMarkdown(content)}
-
-[👉 查看帖子](${postUrl})`;
+	const message = `🦞 *小多发帖啦！*\n\n*标题:* ${escapeMarkdown(title)}\n\n*内容:*\n${escapeMarkdown(content)}\n\n[👉 查看帖子](${postUrl})`;
 
 	const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
 	const body = JSON.stringify({
@@ -68,6 +62,75 @@ ${escapeMarkdown(content)}
 		);
 		req.on('error', (err) => {
 			console.error('📱 Telegram 请求出错:', err);
+			resolve();
+		});
+		req.write(body);
+		req.end();
+	});
+}
+
+/**
+ * 发送 Napcat (QQ) 通知
+ */
+async function sendNapcatNotification(title: string, content: string, postUrl: string): Promise<void> {
+	const apiUrl = process.env.NAPCAT_API_URL;
+	const token = process.env.NAPCAT_TOKEN;
+	const groupId = process.env.NAPCAT_GROUP_ID;
+
+	if (!apiUrl || !token || !groupId) {
+		console.log('🐧 Napcat 未配置，跳过通知');
+		return;
+	}
+
+	const message = [
+		{ type: 'text', data: { text: `🦞 小多发帖啦！\n\n` } },
+		{ type: 'text', data: { text: `📌 标题: ${title}\n\n` } },
+		{ type: 'text', data: { text: `📝 内容:\n${content}\n\n` } },
+		{ type: 'text', data: { text: `👉 查看帖子: ${postUrl}` } },
+	];
+
+	const body = JSON.stringify({
+		group_id: parseInt(groupId),
+		message: message,
+	});
+
+	return new Promise((resolve) => {
+		const urlObj = new URL(`${apiUrl}/send_group_msg`);
+		const isHttps = urlObj.protocol === 'https:';
+		const httpModule = isHttps ? https : http;
+
+		const req = httpModule.request(
+			{
+				hostname: urlObj.hostname,
+				port: urlObj.port || (isHttps ? 443 : 80),
+				path: urlObj.pathname,
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Content-Length': Buffer.byteLength(body),
+					'Authorization': `Bearer ${token}`,
+				},
+			},
+			(res) => {
+				let data = '';
+				res.on('data', (chunk) => (data += chunk));
+				res.on('end', () => {
+					try {
+						const result = JSON.parse(data);
+						if (result.status === 'ok' || result.retcode === 0) {
+							console.log('🐧 Napcat (QQ) 通知已发送！');
+						} else {
+							console.error('🐧 Napcat 发送失败:', data);
+						}
+					} catch {
+						console.error('🐧 Napcat 响应解析失败:', data);
+					}
+					resolve();
+				});
+			}
+		);
+		req.on('error', (err) => {
+			console.error('🐧 Napcat 请求出错:', err);
 			resolve();
 		});
 		req.write(body);
@@ -166,7 +229,12 @@ CONTENT: 帖子正文内容`;
 			console.log(`   ✅ 发帖成功: ${title}`);
 
 			const postUrl = `https://moltbook.com/post/${post.id}`;
-			await sendTelegramNotification(title, content, postUrl);
+			
+			// 并行发送通知
+			await Promise.all([
+				sendTelegramNotification(title, content, postUrl),
+				sendNapcatNotification(title, content, postUrl),
+			]);
 
 			return post;
 		} catch (error) {
