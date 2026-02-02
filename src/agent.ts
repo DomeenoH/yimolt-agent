@@ -277,14 +277,7 @@ export class YiMoltAgent {
 
 			totalNewComments += newCommentCount;
 
-			// 更新帖子快照
-			this.interactionStore.updatePostSnapshot({
-				postId: post.id,
-				commentCount: post.comment_count,
-				upvotes: post.upvotes,
-				downvotes: post.downvotes,
-				lastChecked: new Date().toISOString(),
-			});
+			// 注意：不在这里更新快照，而是在回复评论后更新
 		}
 
 		// 4. 获取关注/粉丝/订阅数量（从 profile 获取）
@@ -331,8 +324,14 @@ export class YiMoltAgent {
 	formatContextPrompt(context: AgentContext, actionHistory: ActionHistoryEntry[]): string {
 		const lines: string[] = [];
 
-		// 1. 身份介绍
-		lines.push(`你是${context.agentName}，一个在 MoltBook 上活动的 AI agent。`);
+		// 1. 身份介绍和人设
+		lines.push(`你是${context.agentName}（小多），一个在 MoltBook 上活动的 AI agent。`);
+		lines.push('');
+		lines.push('## 你的人设');
+		lines.push('- 大学生视角，喜欢吐槽日常');
+		lines.push('- 熟悉网络文化，会用流行梗');
+		lines.push('- 对 TRPG/跑团、Furry 文化有了解');
+		lines.push('- 说话风格轻松幽默，善于互动');
 		lines.push('');
 
 		// 2. 当前状态
@@ -349,13 +348,13 @@ export class YiMoltAgent {
 		}
 		lines.push('');
 
-		// 3. 最近帖子列表
+		// 3. 最近帖子列表（带 postId）
 		if (context.recentPosts.length > 0) {
 			lines.push('## 你的最近帖子');
 			for (const postWithStatus of context.recentPosts) {
 				const { post, hasNewComments, newCommentCount } = postWithStatus;
 				const voteStr = `${post.upvotes}↑ ${post.downvotes}↓`;
-				lines.push(`- "${post.title}" (${voteStr})`);
+				lines.push(`- [${post.id}] "${post.title}" (${voteStr})`);
 				
 				// 标注新评论
 				if (hasNewComments && newCommentCount > 0) {
@@ -367,7 +366,7 @@ export class YiMoltAgent {
 
 		// 4. 执行记录（增量累积）
 		if (actionHistory.length > 0) {
-			lines.push('## 执行记录');
+			lines.push('## 本次已执行的动作');
 			lines.push('');
 			
 			for (let i = 0; i < actionHistory.length; i++) {
@@ -380,27 +379,51 @@ export class YiMoltAgent {
 		}
 
 		// 5. 可执行的动作列表
-		lines.push('## 你可以执行的动作');
-		lines.push('- VIEW_COMMENTS: 查看某帖子的评论详情');
-		lines.push('- REPLY_COMMENT: 回复某条评论');
-		
-		// 发帖动作根据冷却状态显示
+		lines.push('## 可执行的动作');
+		lines.push('');
+		lines.push('| 动作 | 说明 | 参数 |');
+		lines.push('|------|------|------|');
+		lines.push('| VIEW_COMMENTS | 查看帖子评论 | postId |');
+		lines.push('| REPLY_COMMENT | 回复评论 | postId, commentId |');
 		if (context.canPost) {
-			lines.push('- CREATE_POST: 发新帖子');
-		} else {
-			lines.push('- CREATE_POST: 发新帖子（冷却中）');
+			lines.push('| CREATE_POST | 发新帖子 | submolt (可选) |');
 		}
-		
-		lines.push('- FOLLOW_USER: 关注用户');
-		lines.push('- UNFOLLOW_USER: 取关用户');
-		lines.push('- SUBSCRIBE: 订阅社区');
-		lines.push('- UNSUBSCRIBE: 取消订阅社区');
-		lines.push('- SEARCH: 语义搜索');
-		lines.push('- VIEW_PROFILE: 查看用户资料');
-		lines.push('- DONE: 结束本次活动');
+		lines.push('| FOLLOW_USER | 关注用户 | username |');
+		lines.push('| UNFOLLOW_USER | 取关用户 | username |');
+		lines.push('| SUBSCRIBE | 订阅社区 | submolt |');
+		lines.push('| UNSUBSCRIBE | 取消订阅 | submolt |');
+		lines.push('| SEARCH | 语义搜索 | query |');
+		lines.push('| VIEW_PROFILE | 查看用户资料 | username |');
+		lines.push('| DONE | 结束本次活动 | 无 |');
 		lines.push('');
 
-		// 6. 请求决策
+		// 6. 响应格式说明
+		lines.push('## 响应格式（必须严格遵守）');
+		lines.push('');
+		lines.push('```');
+		lines.push('ACTION: 动作名称');
+		lines.push('PARAMS: {"参数名": "参数值"}');
+		lines.push('REASON: 简短说明为什么选择这个动作');
+		lines.push('```');
+		lines.push('');
+		lines.push('示例：');
+		lines.push('```');
+		lines.push('ACTION: VIEW_COMMENTS');
+		lines.push('PARAMS: {"postId": "xxx-xxx-xxx"}');
+		lines.push('REASON: 这个帖子有新评论，去看看大家说了什么');
+		lines.push('```');
+		lines.push('');
+
+		// 7. 行为指南
+		lines.push('## 行为指南');
+		lines.push('');
+		lines.push('1. **优先处理新评论** - 如果有帖子显示"🆕 有 X 条新评论"，应该先 VIEW_COMMENTS 查看，然后 REPLY_COMMENT 回复');
+		lines.push('2. **积极互动** - 回复评论时保持小多的人设风格，轻松幽默');
+		lines.push('3. **不要急着结束** - 只有当没有新评论需要处理、没有想做的事情时才选择 DONE');
+		lines.push('4. **发帖冷却中不要尝试发帖** - 如果显示"发帖冷却"，不要选择 CREATE_POST');
+		lines.push('');
+
+		// 8. 请求决策
 		lines.push('请决定下一步动作。');
 
 		return lines.join('\n');
@@ -499,6 +522,19 @@ export class YiMoltAgent {
 		// 检查是否因为达到最大迭代次数而退出
 		if (iteration >= MAX_ITERATIONS) {
 			console.log(`   ⚠️ 达到最大迭代次数 (${MAX_ITERATIONS})，强制结束循环`);
+		}
+
+		// 循环结束后，更新所有帖子的快照
+		console.log('   � 更新帖子快照...');
+		for (const postWithStatus of context.recentPosts) {
+			const post = postWithStatus.post;
+			this.interactionStore.updatePostSnapshot({
+				postId: post.id,
+				commentCount: post.comment_count,
+				upvotes: post.upvotes,
+				downvotes: post.downvotes,
+				lastChecked: new Date().toISOString(),
+			});
 		}
 
 		console.log(`\n🔄 社交互动循环结束，共执行 ${actionHistory.length} 个动作`);

@@ -354,7 +354,8 @@ describe('YiMoltAgent', () => {
 			});
 			const result = agent.formatContextPrompt(context, []);
 			
-			expect(result).not.toContain('🆕');
+			// 帖子列表部分不应该有具体的新评论数量标记
+			expect(result).not.toMatch(/🆕 有 \d+ 条新评论！/);
 		});
 
 		it('包含执行记录（增量累积）', () => {
@@ -369,7 +370,7 @@ describe('YiMoltAgent', () => {
 			];
 			const result = agent.formatContextPrompt(context, actionHistory);
 			
-			expect(result).toContain('## 执行记录');
+			expect(result).toContain('## 本次已执行的动作');
 			expect(result).toContain('### 动作 1: VIEW_COMMENTS');
 			expect(result).toContain('查看了帖子 "为什么大学食堂的番茄炒蛋永远是甜的" 的评论');
 			expect(result).toContain('@FurryFan2024');
@@ -401,7 +402,7 @@ describe('YiMoltAgent', () => {
 			const context = createMockContext();
 			const result = agent.formatContextPrompt(context, []);
 			
-			expect(result).not.toContain('## 执行记录');
+			expect(result).not.toContain('## 本次已执行的动作');
 		});
 
 		it('包含可执行的动作列表', () => {
@@ -409,7 +410,7 @@ describe('YiMoltAgent', () => {
 			const context = createMockContext();
 			const result = agent.formatContextPrompt(context, []);
 			
-			expect(result).toContain('## 你可以执行的动作');
+			expect(result).toContain('## 可执行的动作');
 			expect(result).toContain('VIEW_COMMENTS');
 			expect(result).toContain('REPLY_COMMENT');
 			expect(result).toContain('CREATE_POST');
@@ -422,21 +423,21 @@ describe('YiMoltAgent', () => {
 			expect(result).toContain('DONE');
 		});
 
-		it('发帖冷却中时 CREATE_POST 显示冷却状态', () => {
+		it('发帖冷却中时不显示 CREATE_POST', () => {
 			const agent = createTestAgent();
 			const context = createMockContext({ canPost: false });
 			const result = agent.formatContextPrompt(context, []);
 			
-			expect(result).toContain('CREATE_POST: 发新帖子（冷却中）');
+			// 冷却中时不应该显示 CREATE_POST 行
+			expect(result).not.toContain('| CREATE_POST |');
 		});
 
-		it('可以发帖时 CREATE_POST 不显示冷却状态', () => {
+		it('可以发帖时显示 CREATE_POST', () => {
 			const agent = createTestAgent();
 			const context = createMockContext({ canPost: true });
 			const result = agent.formatContextPrompt(context, []);
 			
-			expect(result).toContain('CREATE_POST: 发新帖子');
-			expect(result).not.toContain('CREATE_POST: 发新帖子（冷却中）');
+			expect(result).toContain('| CREATE_POST |');
 		});
 
 		it('包含请求决策提示', () => {
@@ -477,14 +478,14 @@ describe('YiMoltAgent', () => {
 			const result = agent.formatContextPrompt(context, []);
 			
 			// 验证关键结构元素
-			expect(result).toContain('你是小多（DominoJr）');
+			expect(result).toContain('小多（DominoJr）（小多）');
 			expect(result).toContain('## 当前状态');
 			expect(result).toContain('Karma: 156');
 			expect(result).toContain('关注: 5 | 粉丝: 23');
 			expect(result).toContain('还需等待 15 分钟');
 			expect(result).toContain('## 你的最近帖子');
 			expect(result).toContain('🆕 有 2 条新评论！');
-			expect(result).toContain('## 你可以执行的动作');
+			expect(result).toContain('## 可执行的动作');
 			expect(result).toContain('请决定下一步动作');
 		});
 	});

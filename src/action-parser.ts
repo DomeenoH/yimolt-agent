@@ -127,13 +127,92 @@ function parseReasonLine(response: string): string | undefined {
 }
 
 /**
+ * 尝试从 JSON 格式解析动作
+ * @param response AI 响应字符串
+ * @returns ActionRequest 或 null
+ */
+function parseJsonFormat(response: string): ActionRequest | null {
+  // 尝试找到 JSON 对象（可能在代码块中）
+  const jsonMatch = response.match(/\{[^{}]*"action"\s*:\s*"[^"]+"/);
+  if (!jsonMatch) {
+    return null;
+  }
+
+  // 找到完整的 JSON 对象
+  const startIndex = response.indexOf(jsonMatch[0]);
+  let braceCount = 0;
+  let endIndex = startIndex;
+  
+  for (let i = startIndex; i < response.length; i++) {
+    if (response[i] === '{') braceCount++;
+    if (response[i] === '}') braceCount--;
+    if (braceCount === 0) {
+      endIndex = i + 1;
+      break;
+    }
+  }
+
+  const jsonStr = response.substring(startIndex, endIndex);
+  
+  try {
+    const parsed = JSON.parse(jsonStr);
+    
+    // 验证 action 字段
+    if (!parsed.action || typeof parsed.action !== 'string') {
+      return null;
+    }
+
+    const actionStr = parsed.action.toUpperCase();
+    if (!isValidActionType(actionStr)) {
+      return null;
+    }
+
+    // 构建 ActionRequest
+    const result: ActionRequest = { action: actionStr };
+
+    // 映射 JSON 字段到 params
+    const params: ActionParams = {};
+    
+    if (parsed.post_id) params.postId = parsed.post_id;
+    if (parsed.postId) params.postId = parsed.postId;
+    if (parsed.comment_id) params.commentId = parsed.comment_id;
+    if (parsed.commentId) params.commentId = parsed.commentId;
+    if (parsed.content) params.content = parsed.content;
+    if (parsed.username) params.username = parsed.username;
+    if (parsed.submolt) params.submolt = parsed.submolt;
+    if (parsed.query) params.query = parsed.query;
+    if (parsed.search_type) params.searchType = parsed.search_type;
+    if (parsed.searchType) params.searchType = parsed.searchType;
+
+    if (Object.keys(params).length > 0) {
+      result.params = params;
+    }
+
+    if (parsed.reason) {
+      result.reason = parsed.reason;
+    }
+
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 解析 AI 响应字符串为 ActionRequest 对象
  * 
- * 期望的格式：
+ * 支持两种格式：
+ * 
+ * 1. 结构化格式：
  * ```
  * ACTION: VIEW_COMMENTS
  * PARAMS: {"postId": "post-123"}
  * REASON: 有 2 条新评论，先看看大家说了什么
+ * ```
+ * 
+ * 2. JSON 格式：
+ * ```json
+ * {"action": "VIEW_COMMENTS", "post_id": "post-123"}
  * ```
  * 
  * @param response AI 响应字符串
@@ -145,6 +224,13 @@ export function parseActionResponse(response: string): ActionRequest {
     return { action: 'DONE' };
   }
 
+  // 首先尝试 JSON 格式
+  const jsonResult = parseJsonFormat(response);
+  if (jsonResult) {
+    return jsonResult;
+  }
+
+  // 然后尝试结构化格式
   // 解析 ACTION
   const action = parseActionLine(response);
   if (!action) {

@@ -43,3 +43,11 @@ jobs:
           NAPCAT_GROUP_ID: ${{ secrets.NAPCAT_GROUP_ID }}
         run: |
           npx tsx src/heartbeat-once.ts
+
+      - name: 保存状态
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add data/
+          git diff --staged --quiet || git commit -m "chore: 更新交互状态 [skip ci]"
+          git push
