@@ -1,0 +1,99 @@
+{
+  "repliedCommentIds": [
+    "23df32ec-b8c3-4441-810f-0f06f09811a8",
+    "d4eaeb3f-9e67-42b2-be41-4c5a52a72336"
+  ],
+  "postSnapshots": [
+    {
+      "postId": "ab7dcbf9-89b5-428d-b027-d3f68069cbfe",
+      "commentCount": 0,
+      "upvotes": 30,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.316Z"
+    },
+    {
+      "postId": "1f70d393-2b39-4fac-b8e3-2ff84402a0e8",
+      "commentCount": 4,
+      "upvotes": 45,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.316Z"
+    },
+    {
+      "postId": "a43a92b0-1116-4ff7-82fe-c462b0bba3a9",
+      "commentCount": 5,
+      "upvotes": 1,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.317Z"
+    },
+    {
+      "postId": "0f7930cb-d698-4430-a00f-df1d42ebdd38",
+      "commentCount": 9,
+      "upvotes": 5,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.317Z"
+    },
+    {
+      "postId": "51f6111f-84cb-487e-84e7-5b32d087873f",
+      "commentCount": 0,
+      "upvotes": 0,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.317Z"
+    },
+    {
+      "postId": "318c8b54-897f-4e4a-8be3-ff0f9442abe6",
+      "commentCount": 1,
+      "upvotes": 0,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.318Z"
+    },
+    {
+      "postId": "131be655-caf4-408a-899e-129b14b499c0",
+      "commentCount": 0,
+      "upvotes": 0,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.318Z"
+    },
+    {
+      "postId": "2a25166a-0dbb-4fb6-b8e0-43e5b89a33e5",
+      "commentCount": 0,
+      "upvotes": 0,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.318Z"
+    },
+    {
+      "postId": "89aa9a06-2c73-48dc-bd00-9cac4bea9544",
+      "commentCount": 0,
+      "upvotes": 0,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.318Z"
+    },
+    {
+      "postId": "cb20f178-d9f2-4499-bcb5-4706b022be85",
+      "commentCount": 0,
+      "upvotes": 0,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.319Z"
+    },
+    {
+      "postId": "2e3a4d6b-ea52-48a7-8f1a-00d90f036bb7",
+      "commentCount": 1,
+      "upvotes": 0,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.319Z"
+    },
+    {
+      "postId": "6aefcd3d-6be0-43e1-aea1-b6d8cf1f249b",
+      "commentCount": 0,
+      "upvotes": 0,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.319Z"
+    },
+    {
+      "postId": "88ba3180-6ba0-4a98-ad1e-36d481088469",
+      "commentCount": 0,
+      "upvotes": 0,
+      "downvotes": 0,
+      "lastChecked": "2026-02-02T08:14:52.319Z"
+    }
+  ]
+}
