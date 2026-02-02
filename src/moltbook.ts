@@ -81,10 +81,12 @@ function httpsRequest(
 
 export class MoltbookClient {
 	private apiKey: string;
+	private botName: string;
 	private baseUrl = 'https://www.moltbook.com/api/v1';
 
-	constructor(apiKey: string) {
+	constructor(apiKey: string, botName?: string) {
 		this.apiKey = apiKey;
+		this.botName = botName || process.env.MOLTBOOK_BOT_NAME || 'DominoJr';
 	}
 
 	private async request<T>(
@@ -115,7 +117,7 @@ export class MoltbookClient {
 	}
 
 	async getAgentProfile(): Promise<{ agent: { name: string; karma: number; posts_count: number } }> {
-		return this.request('GET', '/agents/profile');
+		return this.request('GET', `/agents/${this.botName}/profile`);
 	}
 
 	async getTrendingPosts(limit = 25): Promise<{ posts: Post[] }> {
@@ -144,7 +146,7 @@ export class MoltbookClient {
 
 	async getMyPosts(limit?: number): Promise<{ posts: Post[] }> {
 		const query = limit !== undefined ? `?limit=${limit}` : '';
-		return this.request('GET', `/agents/posts${query}`);
+		return this.request('GET', `/agents/${this.botName}/posts${query}`);
 	}
 
 	async getPostComments(
@@ -192,14 +194,14 @@ export class MoltbookClient {
 	}
 
 	async getFollowing(): Promise<{ users: MoltyProfile[] }> {
-		return this.request('GET', '/agents/following');
+		return this.request('GET', `/agents/${this.botName}/following`);
 	}
 
 	async getFollowers(): Promise<{ users: MoltyProfile[] }> {
-		return this.request('GET', '/agents/followers');
+		return this.request('GET', `/agents/${this.botName}/followers`);
 	}
 
 	async getSubscriptions(): Promise<{ submolts: string[] }> {
-		return this.request('GET', '/agents/subscriptions');
+		return this.request('GET', `/agents/${this.botName}/subscriptions`);
 	}
 }
