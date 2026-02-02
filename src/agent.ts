@@ -1320,6 +1320,9 @@ ${titleList}
 
 			console.log('\n═══════════════════════════════════════════════════════════');
 			console.log('✅ 心跳完成\n');
+
+			// 生成人类可读的日志
+			this.activityLog.generateReadableLog();
 		} catch (error) {
 			console.error('❌ 心跳出错:', error);
 		}
