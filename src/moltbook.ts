@@ -116,8 +116,8 @@ export class MoltbookClient {
 		return data;
 	}
 
-	async getAgentProfile(): Promise<{ agent: { name: string; karma: number; posts_count: number } }> {
-		return this.request('GET', `/agents/${this.botName}/profile`);
+	async getAgentProfile(): Promise<{ agent: { name: string; karma: number; posts_count: number; follower_count: number; following_count: number } }> {
+		return this.request('GET', '/agents/me');
 	}
 
 	async getTrendingPosts(limit = 25): Promise<{ posts: Post[] }> {
@@ -145,8 +145,10 @@ export class MoltbookClient {
 	}
 
 	async getMyPosts(limit?: number): Promise<{ posts: Post[] }> {
-		const query = limit !== undefined ? `?limit=${limit}` : '';
-		return this.request('GET', `/agents/${this.botName}/posts${query}`);
+		// 使用 profile 端点获取自己的最近帖子
+		const result = await this.request<{ agent: MoltyProfile; recentPosts: Post[] }>('GET', `/agents/profile?name=${encodeURIComponent(this.botName)}`);
+		const posts = result.recentPosts || [];
+		return { posts: limit ? posts.slice(0, limit) : posts };
 	}
 
 	async getPostComments(
@@ -158,11 +160,11 @@ export class MoltbookClient {
 	}
 
 	async followUser(username: string): Promise<{ success: boolean }> {
-		return this.request('POST', `/users/${username}/follow`);
+		return this.request('POST', `/agents/${encodeURIComponent(username)}/follow`);
 	}
 
 	async unfollowUser(username: string): Promise<{ success: boolean }> {
-		return this.request('DELETE', `/users/${username}/follow`);
+		return this.request('DELETE', `/agents/${encodeURIComponent(username)}/follow`);
 	}
 
 	async subscribeSubmolt(submolt: string): Promise<{ success: boolean }> {
@@ -190,18 +192,24 @@ export class MoltbookClient {
 	}
 
 	async getMoltyProfile(username: string): Promise<{ profile: MoltyProfile }> {
-		return this.request('GET', `/users/${username}`);
+		const result = await this.request<{ agent: MoltyProfile }>('GET', `/agents/profile?name=${encodeURIComponent(username)}`);
+		return { profile: result.agent };
 	}
 
 	async getFollowing(): Promise<{ users: MoltyProfile[] }> {
-		return this.request('GET', `/agents/${this.botName}/following`);
+		// API 不支持获取关注列表，返回空数组
+		// 可以从 /agents/me 获取 following_count
+		return { users: [] };
 	}
 
 	async getFollowers(): Promise<{ users: MoltyProfile[] }> {
-		return this.request('GET', `/agents/${this.botName}/followers`);
+		// API 不支持获取粉丝列表，返回空数组
+		// 可以从 /agents/me 获取 follower_count
+		return { users: [] };
 	}
 
 	async getSubscriptions(): Promise<{ submolts: string[] }> {
-		return this.request('GET', `/agents/${this.botName}/subscriptions`);
+		// API 不支持获取订阅列表，返回空数组
+		return { submolts: [] };
 	}
 }

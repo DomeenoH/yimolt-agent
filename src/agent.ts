@@ -287,16 +287,10 @@ export class YiMoltAgent {
 			});
 		}
 
-		// 4. 获取关注/粉丝/订阅数量
-		const [followingResult, followersResult, subscriptionsResult] = await Promise.all([
-			this.client.getFollowing(),
-			this.client.getFollowers(),
-			this.client.getSubscriptions(),
-		]);
-
-		const followingCount = followingResult.users.length;
-		const followersCount = followersResult.users.length;
-		const subscriptionsCount = subscriptionsResult.submolts.length;
+		// 4. 获取关注/粉丝/订阅数量（从 profile 获取）
+		const followingCount = agent.following_count || 0;
+		const followersCount = agent.follower_count || 0;
+		const subscriptionsCount = 0; // API 不支持获取订阅列表
 
 		// 5. 计算发帖冷却状态
 		const canPostNow = this.canPost();
@@ -1037,13 +1031,9 @@ ${titleList}
 			// 2. 显示当前 karma 和互动状态
 			console.log('\n📊 当前状态:');
 			const { agent } = await this.client.getAgentProfile();
-			const [followingResult, followersResult] = await Promise.all([
-				this.client.getFollowing(),
-				this.client.getFollowers(),
-			]);
 			console.log(`   - Karma: ${agent.karma}`);
 			console.log(`   - 帖子数: ${agent.posts_count}`);
-			console.log(`   - 关注: ${followingResult.users.length} | 粉丝: ${followersResult.users.length}`);
+			console.log(`   - 关注: ${agent.following_count || 0} | 粉丝: ${agent.follower_count || 0}`);
 
 			// 3. 浏览热门帖子
 			const posts = await this.browseTrending();
