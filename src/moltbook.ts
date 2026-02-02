@@ -27,6 +27,20 @@ export interface Comment {
 	parent_id?: string;
 }
 
+export interface SearchResult {
+	posts?: Post[];
+	comments?: Comment[];
+}
+
+export interface MoltyProfile {
+	id: string;
+	name: string;
+	karma: number;
+	posts_count: number;
+	created_at: string;
+	bio?: string;
+}
+
 function httpsRequest(
 	method: string,
 	url: string,
@@ -122,5 +136,70 @@ export class MoltbookClient {
 
 	async createComment(postId: string, content: string): Promise<{ comment: Comment }> {
 		return this.request('POST', `/posts/${postId}/comments`, { content });
+	}
+
+	async replyToComment(postId: string, parentId: string, content: string): Promise<{ comment: Comment }> {
+		return this.request('POST', `/posts/${postId}/comments`, { content, parent_id: parentId });
+	}
+
+	async getMyPosts(limit?: number): Promise<{ posts: Post[] }> {
+		const query = limit !== undefined ? `?limit=${limit}` : '';
+		return this.request('GET', `/agents/posts${query}`);
+	}
+
+	async getPostComments(
+		postId: string,
+		sort?: 'top' | 'new' | 'controversial'
+	): Promise<{ comments: Comment[] }> {
+		const query = sort ? `?sort=${sort}` : '';
+		return this.request('GET', `/posts/${postId}/comments${query}`);
+	}
+
+	async followUser(username: string): Promise<{ success: boolean }> {
+		return this.request('POST', `/users/${username}/follow`);
+	}
+
+	async unfollowUser(username: string): Promise<{ success: boolean }> {
+		return this.request('DELETE', `/users/${username}/follow`);
+	}
+
+	async subscribeSubmolt(submolt: string): Promise<{ success: boolean }> {
+		return this.request('POST', `/submolts/${submolt}/subscribe`);
+	}
+
+	async unsubscribeSubmolt(submolt: string): Promise<{ success: boolean }> {
+		return this.request('DELETE', `/submolts/${submolt}/subscribe`);
+	}
+
+	async semanticSearch(
+		query: string,
+		type?: 'posts' | 'comments' | 'all',
+		limit?: number
+	): Promise<SearchResult> {
+		const params = new URLSearchParams();
+		params.append('q', query);
+		if (type !== undefined) {
+			params.append('type', type);
+		}
+		if (limit !== undefined) {
+			params.append('limit', limit.toString());
+		}
+		return this.request('GET', `/search?${params.toString()}`);
+	}
+
+	async getMoltyProfile(username: string): Promise<{ profile: MoltyProfile }> {
+		return this.request('GET', `/users/${username}`);
+	}
+
+	async getFollowing(): Promise<{ users: MoltyProfile[] }> {
+		return this.request('GET', '/agents/following');
+	}
+
+	async getFollowers(): Promise<{ users: MoltyProfile[] }> {
+		return this.request('GET', '/agents/followers');
+	}
+
+	async getSubscriptions(): Promise<{ submolts: string[] }> {
+		return this.request('GET', '/agents/subscriptions');
 	}
 }

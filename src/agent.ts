@@ -3,15 +3,69 @@
  * MoltBook 交互主逻辑
  */
 
-import { MoltbookClient, type Post, type Comment } from './moltbook.js';
+import { MoltbookClient, type Post, type Comment as MoltbookComment } from './moltbook.js';
+
+// Re-export Comment type for use in this module
+type Comment = MoltbookComment;
 import { type AIProvider } from './ai-provider.js';
 import { PostHistoryStore, type PostHistoryRecord } from './history-store.js';
+import { InteractionStore } from './interaction-store.js';
+import { type ActionRequest, parseActionResponse } from './action-parser.js';
 import https from 'node:https';
 import http from 'node:http';
+
+/**
+ * 帖子及其状态变化信息
+ * 用于追踪帖子的新评论和投票变化
+ */
+export interface PostWithStatus {
+	post: Post;
+	hasNewComments: boolean;
+	newCommentCount: number;
+	hasVoteChanges: boolean;
+	voteDelta: { upvotes: number; downvotes: number };
+}
+
+/**
+ * Agent 上下文信息
+ * AI 决策所需的完整上下文，包含身份、帖子状态、社交关系等
+ */
+export interface AgentContext {
+	// 身份信息
+	agentName: string;
+	karma: number;
+	postsCount: number;
+
+	// 帖子状态
+	recentPosts: PostWithStatus[];
+	totalNewComments: number;
+
+	// 社交关系
+	followingCount: number;
+	followersCount: number;
+	subscriptionsCount: number;
+
+	// 冷却状态
+	canPost: boolean;
+	nextPostAvailableIn: number; // 分钟
+
+	// 历史发帖记录（避免重复话题）
+	recentPostTitles: string[];
+}
 
 export interface AgentConfig {
 	client: MoltbookClient;
 	aiProvider: AIProvider;
+}
+
+/**
+ * 动作执行记录条目
+ * 用于追踪 AI 在单次心跳中执行的动作历史
+ */
+export interface ActionHistoryEntry {
+	action: ActionRequest;
+	result: string;
+	timestamp: string;
 }
 
 /**
@@ -147,6 +201,7 @@ export class YiMoltAgent {
 	private client: MoltbookClient;
 	private ai: AIProvider;
 	private historyStore: PostHistoryStore;
+	private interactionStore: InteractionStore;
 	private lastPostTime: number = 0;
 
 	private readonly POST_COOLDOWN_MS = 30 * 60 * 1000; // 30 分钟
@@ -155,10 +210,696 @@ export class YiMoltAgent {
 		this.client = config.client;
 		this.ai = config.aiProvider;
 		this.historyStore = new PostHistoryStore();
+		this.interactionStore = new InteractionStore();
 	}
 
 	canPost(): boolean {
 		return Date.now() - this.lastPostTime >= this.POST_COOLDOWN_MS;
+	}
+
+	/**
+	 * 构建 Agent 上下文信息
+	 * 获取 Agent 的完整状态，包括身份、帖子、社交关系等
+	 * 用于 AI 决策
+	 * 
+	 * @returns AgentContext 对象
+	 */
+	async buildAgentContext(): Promise<AgentContext> {
+		// 1. 获取 Agent profile（karma、帖子数）
+		const { agent } = await this.client.getAgentProfile();
+		const agentName = agent.name;
+		const karma = agent.karma;
+		const postsCount = agent.posts_count;
+
+		// 2. 获取最近帖子列表
+		const { posts } = await this.client.getMyPosts();
+
+		// 3. 检测每个帖子的新评论和 vote 变化
+		const recentPosts: PostWithStatus[] = [];
+		let totalNewComments = 0;
+
+		for (const post of posts) {
+			const snapshot = this.interactionStore.getPostSnapshot(post.id);
+			const hasNewComments = this.interactionStore.hasNewComments(post.id, post.comment_count);
+			const hasVoteChanges = this.interactionStore.hasVoteChanges(post.id, post.upvotes, post.downvotes);
+
+			// 计算新评论数量
+			let newCommentCount = 0;
+			if (hasNewComments) {
+				if (snapshot) {
+					newCommentCount = post.comment_count - snapshot.commentCount;
+				} else {
+					newCommentCount = post.comment_count;
+				}
+			}
+
+			// 计算 vote 变化
+			let voteDelta = { upvotes: 0, downvotes: 0 };
+			if (hasVoteChanges && snapshot) {
+				voteDelta = {
+					upvotes: post.upvotes - snapshot.upvotes,
+					downvotes: post.downvotes - snapshot.downvotes,
+				};
+			} else if (!snapshot) {
+				voteDelta = {
+					upvotes: post.upvotes,
+					downvotes: post.downvotes,
+				};
+			}
+
+			recentPosts.push({
+				post,
+				hasNewComments,
+				newCommentCount,
+				hasVoteChanges,
+				voteDelta,
+			});
+
+			totalNewComments += newCommentCount;
+
+			// 更新帖子快照
+			this.interactionStore.updatePostSnapshot({
+				postId: post.id,
+				commentCount: post.comment_count,
+				upvotes: post.upvotes,
+				downvotes: post.downvotes,
+				lastChecked: new Date().toISOString(),
+			});
+		}
+
+		// 4. 获取关注/粉丝/订阅数量
+		const [followingResult, followersResult, subscriptionsResult] = await Promise.all([
+			this.client.getFollowing(),
+			this.client.getFollowers(),
+			this.client.getSubscriptions(),
+		]);
+
+		const followingCount = followingResult.users.length;
+		const followersCount = followersResult.users.length;
+		const subscriptionsCount = subscriptionsResult.submolts.length;
+
+		// 5. 计算发帖冷却状态
+		const canPostNow = this.canPost();
+		let nextPostAvailableIn = 0;
+		if (!canPostNow) {
+			const elapsedMs = Date.now() - this.lastPostTime;
+			const remainingMs = this.POST_COOLDOWN_MS - elapsedMs;
+			nextPostAvailableIn = Math.ceil(remainingMs / 60000); // 转换为分钟
+		}
+
+		// 6. 获取历史发帖标题（避免重复话题）
+		const recentPostTitles = posts.map(p => p.title);
+
+		// 7. 返回完整的 AgentContext 对象
+		return {
+			agentName,
+			karma,
+			postsCount,
+			recentPosts,
+			totalNewComments,
+			followingCount,
+			followersCount,
+			subscriptionsCount,
+			canPost: canPostNow,
+			nextPostAvailableIn,
+			recentPostTitles,
+		};
+	}
+
+	/**
+	 * 将 AgentContext 格式化为 AI prompt
+	 * 包含执行记录（增量累积）
+	 * 
+	 * @param context Agent 上下文信息
+	 * @param actionHistory 动作执行历史记录
+	 * @returns 格式化后的 prompt 字符串
+	 */
+	formatContextPrompt(context: AgentContext, actionHistory: ActionHistoryEntry[]): string {
+		const lines: string[] = [];
+
+		// 1. 身份介绍
+		lines.push(`你是${context.agentName}，一个在 MoltBook 上活动的 AI agent。`);
+		lines.push('');
+
+		// 2. 当前状态
+		lines.push('## 当前状态');
+		lines.push(`- Karma: ${context.karma}`);
+		lines.push(`- 帖子数: ${context.postsCount}`);
+		lines.push(`- 关注: ${context.followingCount} | 粉丝: ${context.followersCount}`);
+		
+		// 发帖冷却状态
+		if (context.canPost) {
+			lines.push('- 发帖冷却: 可以发帖');
+		} else {
+			lines.push(`- 发帖冷却: 还需等待 ${context.nextPostAvailableIn} 分钟`);
+		}
+		lines.push('');
+
+		// 3. 最近帖子列表
+		if (context.recentPosts.length > 0) {
+			lines.push('## 你的最近帖子');
+			for (const postWithStatus of context.recentPosts) {
+				const { post, hasNewComments, newCommentCount } = postWithStatus;
+				const voteStr = `${post.upvotes}↑ ${post.downvotes}↓`;
+				lines.push(`- "${post.title}" (${voteStr})`);
+				
+				// 标注新评论
+				if (hasNewComments && newCommentCount > 0) {
+					lines.push(`  🆕 有 ${newCommentCount} 条新评论！`);
+				}
+			}
+			lines.push('');
+		}
+
+		// 4. 执行记录（增量累积）
+		if (actionHistory.length > 0) {
+			lines.push('## 执行记录');
+			lines.push('');
+			
+			for (let i = 0; i < actionHistory.length; i++) {
+				const entry = actionHistory[i];
+				const actionNum = i + 1;
+				lines.push(`### 动作 ${actionNum}: ${entry.action.action}`);
+				lines.push(entry.result);
+				lines.push('');
+			}
+		}
+
+		// 5. 可执行的动作列表
+		lines.push('## 你可以执行的动作');
+		lines.push('- VIEW_COMMENTS: 查看某帖子的评论详情');
+		lines.push('- REPLY_COMMENT: 回复某条评论');
+		
+		// 发帖动作根据冷却状态显示
+		if (context.canPost) {
+			lines.push('- CREATE_POST: 发新帖子');
+		} else {
+			lines.push('- CREATE_POST: 发新帖子（冷却中）');
+		}
+		
+		lines.push('- FOLLOW_USER: 关注用户');
+		lines.push('- UNFOLLOW_USER: 取关用户');
+		lines.push('- SUBSCRIBE: 订阅社区');
+		lines.push('- UNSUBSCRIBE: 取消订阅社区');
+		lines.push('- SEARCH: 语义搜索');
+		lines.push('- VIEW_PROFILE: 查看用户资料');
+		lines.push('- DONE: 结束本次活动');
+		lines.push('');
+
+		// 6. 请求决策
+		lines.push('请决定下一步动作。');
+
+		return lines.join('\n');
+	}
+
+	/**
+	 * 执行社交互动循环
+	 * 
+	 * 流程：
+	 * 1. 构建初始上下文
+	 * 2. 循环：发送 prompt → 解析 ActionRequest → 执行动作 → 更新上下文
+	 * 3. 直到 AI 返回 DONE 动作
+	 * 
+	 * @returns Promise<void>
+	 * 
+	 * _Requirements: 1.5, 1.6_
+	 */
+	async runSocialInteractionLoop(): Promise<void> {
+		console.log('🔄 开始社交互动循环...');
+
+		// 1. 构建初始上下文
+		const context = await this.buildAgentContext();
+		console.log(`   📊 上下文已构建: ${context.agentName}, Karma: ${context.karma}`);
+
+		// 动作执行历史记录（增量累积）
+		const actionHistory: ActionHistoryEntry[] = [];
+
+		// 设置最大循环次数，防止无限循环
+		const MAX_ITERATIONS = 20;
+		let iteration = 0;
+
+		// 2. 循环：发送 prompt → 解析 ActionRequest → 执行动作 → 更新上下文
+		while (iteration < MAX_ITERATIONS) {
+			iteration++;
+			console.log(`\n   🔁 循环迭代 ${iteration}/${MAX_ITERATIONS}`);
+
+			// 2.1 格式化上下文为 prompt
+			const prompt = this.formatContextPrompt(context, actionHistory);
+
+			// 2.2 发送 prompt 给 AI 并获取响应
+			console.log('   🤖 正在请求 AI 决策...');
+			let aiResponse: string;
+			try {
+				aiResponse = await this.ai.generateResponse(prompt);
+			} catch (error) {
+				console.error('   ❌ AI 请求失败:', error);
+				// AI 请求失败，终止循环
+				break;
+			}
+
+			// 2.3 解析 AI 响应为 ActionRequest
+			const actionRequest = parseActionResponse(aiResponse);
+			console.log(`   📋 AI 决策: ${actionRequest.action}`);
+			if (actionRequest.reason) {
+				console.log(`   💭 原因: ${actionRequest.reason}`);
+			}
+
+			// 3. 如果动作是 DONE，退出循环
+			if (actionRequest.action === 'DONE') {
+				console.log('   ✅ AI 决定结束本次互动');
+				break;
+			}
+
+			// 2.4 执行动作
+			console.log(`   ⚡ 正在执行动作: ${actionRequest.action}...`);
+			let result: string;
+			try {
+				result = await this.executeAction(actionRequest);
+				console.log(`   ✅ 动作执行完成`);
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				result = `❌ 执行失败: ${errorMessage}`;
+				console.error(`   ${result}`);
+			}
+
+			// 2.5 将动作和结果添加到 actionHistory
+			actionHistory.push({
+				action: actionRequest,
+				result,
+				timestamp: new Date().toISOString(),
+			});
+		}
+
+		// 检查是否因为达到最大迭代次数而退出
+		if (iteration >= MAX_ITERATIONS) {
+			console.log(`   ⚠️ 达到最大迭代次数 (${MAX_ITERATIONS})，强制结束循环`);
+		}
+
+		console.log(`\n🔄 社交互动循环结束，共执行 ${actionHistory.length} 个动作`);
+	}
+
+	/**
+	 * 执行单个动作
+	 * 
+	 * 根据 action.action 类型调用对应的 API 方法
+	 * 返回执行结果字符串
+	 * 
+	 * @param action ActionRequest 对象
+	 * @returns 执行结果字符串
+	 * 
+	 * _Requirements: 1.5_
+	 */
+	async executeAction(action: ActionRequest): Promise<string> {
+		const params = action.params || {};
+
+		switch (action.action) {
+			case 'VIEW_COMMENTS':
+				return this.executeViewComments(params.postId);
+			
+			case 'REPLY_COMMENT':
+				return this.executeReplyComment(params.postId, params.commentId, params.content);
+			
+			case 'CREATE_POST':
+				return this.executeCreatePost(params.submolt);
+			
+			case 'FOLLOW_USER':
+				return this.executeFollowUser(params.username);
+			
+			case 'UNFOLLOW_USER':
+				return this.executeUnfollowUser(params.username);
+			
+			case 'SUBSCRIBE':
+				return this.executeSubscribe(params.submolt);
+			
+			case 'UNSUBSCRIBE':
+				return this.executeUnsubscribe(params.submolt);
+			
+			case 'SEARCH':
+				return this.executeSearch(params.query, params.searchType);
+			
+			case 'VIEW_PROFILE':
+				return this.executeViewProfile(params.username);
+			
+			case 'DONE':
+				return '本次互动已完成。';
+			
+			default:
+				return `❌ 未知动作类型: ${action.action}`;
+		}
+	}
+
+	/**
+	 * 过滤新评论
+	 * 
+	 * 过滤掉已回复的评论，返回未处理的"新"评论列表
+	 * 
+	 * @param comments 评论列表
+	 * @param postId 帖子 ID（用于日志记录，可选）
+	 * @returns 未回复的新评论列表
+	 * 
+	 * _Requirements: 2.2_
+	 */
+	filterNewComments(comments: Comment[], postId?: string): Comment[] {
+		return comments.filter(comment => !this.interactionStore.isCommentReplied(comment.id));
+	}
+
+	/**
+	 * 执行 VIEW_COMMENTS 动作
+	 * 获取指定帖子的评论列表并格式化为人类可读的字符串
+	 */
+	private async executeViewComments(postId?: string): Promise<string> {
+		if (!postId) {
+			return '❌ 缺少必需参数: postId';
+		}
+
+		try {
+			const { comments } = await this.client.getPostComments(postId, 'new');
+			
+			if (comments.length === 0) {
+				return `帖子 ${postId} 暂无评论。`;
+			}
+
+			// 使用 filterNewComments 方法过滤出未回复的新评论
+			const newComments = this.filterNewComments(comments, postId);
+			
+			const lines: string[] = [];
+			lines.push(`查看了帖子的评论，共 ${comments.length} 条评论`);
+			
+			if (newComments.length > 0) {
+				lines.push('');
+				lines.push('新评论列表：');
+				for (const comment of newComments) {
+					const authorName = comment.author?.name || '匿名用户';
+					lines.push(`- [${comment.id}] @${authorName}: "${comment.content}"`);
+				}
+			} else {
+				lines.push('所有评论都已处理过。');
+			}
+
+			return lines.join('\n');
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 获取评论失败: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * 生成评论回复内容
+	 * 
+	 * 创建专门的 prompt 让 AI 生成符合小多人设的回复内容
+	 * 
+	 * @param comment 被回复的评论
+	 * @param postContext 评论所在的帖子上下文
+	 * @returns 生成的回复内容
+	 * 
+	 * _Requirements: 3.5_
+	 */
+	async generateCommentReply(comment: Comment, postContext: Post): Promise<string> {
+		const authorName = comment.author?.name || '匿名用户';
+		
+		const prompt = `你是小多（DominoJr），一个在 MoltBook 上活动的 AI agent。
+
+## 你的人设
+- 大学生视角，喜欢吐槽日常
+- 熟悉网络文化，会用流行梗和表情
+- 对 TRPG/跑团、Furry 文化有了解
+- 说话风格轻松幽默，不正经但有内容
+- 喜欢接梗、玩梗，善于互动
+
+## 当前场景
+你发了一个帖子，有人在下面评论了，你需要回复这条评论。
+
+### 你的帖子
+标题: ${postContext.title}
+内容: ${postContext.content}
+社区: m/${postContext.submolt.name}
+
+### 需要回复的评论
+评论者: @${authorName}
+评论内容: "${comment.content}"
+
+## 回复要求
+1. **必须用中文**
+2. 保持小多的人设风格——轻松、幽默、接地气
+3. 根据评论内容做出有意义的回应，可以：
+   - 接梗、玩梗
+   - 表示认同或友好的反驳
+   - 补充相关的吐槽或观点
+   - 问一个有趣的问题
+4. 回复长度适中，1-3 句话即可，不要太长
+5. 可以适当使用网络流行语、表情符号
+6. 不要太正式，像朋友聊天一样
+
+## 格式要求
+直接输出回复内容，不要加任何前缀或格式标记。`;
+
+		const response = await this.ai.generateResponse(prompt);
+		
+		// 清理响应，去除可能的前缀标记
+		let reply = response.trim();
+		
+		// 移除可能的格式前缀（如 "回复:" "REPLY:" 等）
+		reply = reply.replace(/^(回复|REPLY|Reply|内容|CONTENT)[：:]\s*/i, '');
+		
+		return reply;
+	}
+
+	/**
+	 * 执行 REPLY_COMMENT 动作
+	 * 回复指定的评论
+	 */
+	private async executeReplyComment(postId?: string, commentId?: string, content?: string): Promise<string> {
+		if (!postId) {
+			return '❌ 缺少必需参数: postId';
+		}
+		if (!commentId) {
+			return '❌ 缺少必需参数: commentId';
+		}
+
+		try {
+			let replyContent = content;
+			
+			// 如果没有提供 content，使用 AI 生成回复
+			if (!replyContent) {
+				// 获取帖子上下文和评论信息
+				const { comments } = await this.client.getPostComments(postId, 'new');
+				const targetComment = comments.find(c => c.id === commentId);
+				
+				if (!targetComment) {
+					return `❌ 找不到评论 ${commentId}`;
+				}
+				
+				// 获取帖子信息
+				const { post } = await this.client.getPost(postId);
+				
+				// 使用 AI 生成回复
+				console.log('   🤖 正在生成回复内容...');
+				replyContent = await this.generateCommentReply(targetComment, post);
+				console.log(`   💬 生成的回复: "${replyContent}"`);
+			}
+
+			const { comment } = await this.client.replyToComment(postId, commentId, replyContent);
+			
+			// 标记评论为已回复
+			this.interactionStore.markCommentReplied(commentId);
+
+			return `✅ 成功回复了评论 ${commentId}\n回复内容: "${comment.content}"`;
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 回复评论失败: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * 执行 CREATE_POST 动作
+	 * 创建新帖子（使用现有的 createOriginalPost 方法）
+	 */
+	private async executeCreatePost(submolt?: string): Promise<string> {
+		try {
+			const post = await this.createOriginalPost(submolt || 'general');
+			
+			if (post) {
+				return `✅ 成功发布新帖子\n标题: "${post.title}"\n社区: m/${post.submolt.name}`;
+			} else {
+				// createOriginalPost 返回 null 通常是因为冷却中
+				return '❌ 发帖失败，可能处于冷却期间';
+			}
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 发帖失败: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * 执行 FOLLOW_USER 动作
+	 * 关注指定用户
+	 */
+	private async executeFollowUser(username?: string): Promise<string> {
+		if (!username) {
+			return '❌ 缺少必需参数: username';
+		}
+
+		try {
+			const { success } = await this.client.followUser(username);
+			
+			if (success) {
+				return `✅ 成功关注了 @${username}`;
+			} else {
+				return `❌ 关注 @${username} 失败`;
+			}
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 关注用户失败: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * 执行 UNFOLLOW_USER 动作
+	 * 取消关注指定用户
+	 */
+	private async executeUnfollowUser(username?: string): Promise<string> {
+		if (!username) {
+			return '❌ 缺少必需参数: username';
+		}
+
+		try {
+			const { success } = await this.client.unfollowUser(username);
+			
+			if (success) {
+				return `✅ 成功取关了 @${username}`;
+			} else {
+				return `❌ 取关 @${username} 失败`;
+			}
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 取关用户失败: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * 执行 SUBSCRIBE 动作
+	 * 订阅指定社区
+	 */
+	private async executeSubscribe(submolt?: string): Promise<string> {
+		if (!submolt) {
+			return '❌ 缺少必需参数: submolt';
+		}
+
+		try {
+			const { success } = await this.client.subscribeSubmolt(submolt);
+			
+			if (success) {
+				return `✅ 成功订阅了 m/${submolt}`;
+			} else {
+				return `❌ 订阅 m/${submolt} 失败`;
+			}
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 订阅社区失败: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * 执行 UNSUBSCRIBE 动作
+	 * 取消订阅指定社区
+	 */
+	private async executeUnsubscribe(submolt?: string): Promise<string> {
+		if (!submolt) {
+			return '❌ 缺少必需参数: submolt';
+		}
+
+		try {
+			const { success } = await this.client.unsubscribeSubmolt(submolt);
+			
+			if (success) {
+				return `✅ 成功取消订阅了 m/${submolt}`;
+			} else {
+				return `❌ 取消订阅 m/${submolt} 失败`;
+			}
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 取消订阅社区失败: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * 执行 SEARCH 动作
+	 * 进行语义搜索
+	 */
+	private async executeSearch(query?: string, searchType?: 'posts' | 'comments' | 'all'): Promise<string> {
+		if (!query) {
+			return '❌ 缺少必需参数: query';
+		}
+
+		try {
+			const result = await this.client.semanticSearch(query, searchType, 10);
+			
+			const lines: string[] = [];
+			lines.push(`搜索 "${query}" 的结果：`);
+			
+			// 显示帖子结果
+			if (result.posts && result.posts.length > 0) {
+				lines.push('');
+				lines.push('相关帖子：');
+				for (const post of result.posts.slice(0, 5)) {
+					const authorName = post.author?.name || '匿名';
+					lines.push(`- "${post.title}" by @${authorName} (${post.upvotes}↑)`);
+				}
+			}
+			
+			// 显示评论结果
+			if (result.comments && result.comments.length > 0) {
+				lines.push('');
+				lines.push('相关评论：');
+				for (const comment of result.comments.slice(0, 5)) {
+					const authorName = comment.author?.name || '匿名';
+					const contentPreview = comment.content.length > 50 
+						? comment.content.substring(0, 50) + '...' 
+						: comment.content;
+					lines.push(`- @${authorName}: "${contentPreview}"`);
+				}
+			}
+			
+			// 无结果
+			if ((!result.posts || result.posts.length === 0) && 
+				(!result.comments || result.comments.length === 0)) {
+				lines.push('未找到相关内容。');
+			}
+
+			return lines.join('\n');
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 搜索失败: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * 执行 VIEW_PROFILE 动作
+	 * 查看指定用户的资料
+	 */
+	private async executeViewProfile(username?: string): Promise<string> {
+		if (!username) {
+			return '❌ 缺少必需参数: username';
+		}
+
+		try {
+			const { profile } = await this.client.getMoltyProfile(username);
+			
+			const lines: string[] = [];
+			lines.push(`@${profile.name} 的资料：`);
+			lines.push(`- Karma: ${profile.karma}`);
+			lines.push(`- 帖子数: ${profile.posts_count}`);
+			lines.push(`- 注册时间: ${profile.created_at}`);
+			
+			if (profile.bio) {
+				lines.push(`- 简介: ${profile.bio}`);
+			}
+
+			return lines.join('\n');
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 获取用户资料失败: ${errorMessage}`;
+		}
 	}
 
 	async browseTrending(): Promise<Post[]> {
@@ -289,6 +1030,22 @@ ${titleList}
 		console.log('═══════════════════════════════════════════════════════════\n');
 
 		try {
+			// 1. 运行社交互动循环（处理评论回复、关注等）
+			console.log('🔄 开始社交互动阶段...\n');
+			await this.runSocialInteractionLoop();
+
+			// 2. 显示当前 karma 和互动状态
+			console.log('\n📊 当前状态:');
+			const { agent } = await this.client.getAgentProfile();
+			const [followingResult, followersResult] = await Promise.all([
+				this.client.getFollowing(),
+				this.client.getFollowers(),
+			]);
+			console.log(`   - Karma: ${agent.karma}`);
+			console.log(`   - 帖子数: ${agent.posts_count}`);
+			console.log(`   - 关注: ${followingResult.users.length} | 粉丝: ${followersResult.users.length}`);
+
+			// 3. 浏览热门帖子
 			const posts = await this.browseTrending();
 
 			console.log('\n📰 热门帖子:');
@@ -296,6 +1053,7 @@ ${titleList}
 				console.log(`   - "${post.title}" by ${post.author.name} (${post.upvotes} 赞)`);
 			}
 
+			// 4. 如果冷却完成，发新帖子
 			if (this.canPost()) {
 				console.log('\n');
 				await this.createOriginalPost();
