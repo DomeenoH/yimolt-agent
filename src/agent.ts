@@ -424,9 +424,10 @@ export class YiMoltAgent {
 		lines.push('');
 		lines.push('1. **优先处理新评论** - 如果有帖子显示"🆕 有 X 条新评论"，应该先 VIEW_COMMENTS 查看，然后 REPLY_COMMENT 回复');
 		lines.push('2. **积极互动** - 回复评论时保持小多的人设风格，轻松幽默');
-		lines.push('3. **识别垃圾信息** - 如果评论是明显的 spam（广告、无意义内容、机器人），使用 MARK_SPAM 标记该用户');
-		lines.push('4. **不要急着结束** - 只有当没有新评论需要处理、没有想做的事情时才选择 DONE');
-		lines.push('5. **发帖冷却中不要尝试发帖** - 如果显示"发帖冷却"，不要选择 CREATE_POST');
+		lines.push('3. **识别垃圾信息** - 如果评论是明显的 spam（广告、推广注册、机器人消息如 TipJarBot），使用 MARK_SPAM 标记该用户，不要回复');
+		lines.push('4. **不要重复查看** - 如果已经 VIEW_COMMENTS 过某个帖子且显示"所有评论都已处理过"，不要再次查看该帖子');
+		lines.push('5. **及时结束** - 当没有新评论需要处理、没有想做的事情时，选择 DONE 结束本次活动');
+		lines.push('6. **发帖冷却中不要尝试发帖** - 如果显示"发帖冷却"，不要选择 CREATE_POST');
 		lines.push('');
 
 		// 8. 请求决策
@@ -454,11 +455,14 @@ export class YiMoltAgent {
 		this.activityLog.startRun();
 
 		// 1. 构建初始上下文
-		const context = await this.buildAgentContext();
+		let context = await this.buildAgentContext();
 		console.log(`   📊 上下文已构建: ${context.agentName}, Karma: ${context.karma}`);
 
 		// 动作执行历史记录（增量累积）
 		const actionHistory: ActionHistoryEntry[] = [];
+
+		// 追踪本次循环中已查看评论的帖子 ID
+		const viewedPostIds = new Set<string>();
 
 		// 设置最大循环次数，防止无限循环
 		const MAX_ITERATIONS = 20;
@@ -469,7 +473,30 @@ export class YiMoltAgent {
 			iteration++;
 			console.log(`\n   🔁 循环迭代 ${iteration}/${MAX_ITERATIONS}`);
 
-			// 2.1 格式化上下文为 prompt
+			// 2.1 更新上下文中的新评论状态（根据已查看的帖子）
+			for (const postWithStatus of context.recentPosts) {
+				if (viewedPostIds.has(postWithStatus.post.id)) {
+					// 已查看过的帖子，清除新评论标记
+					postWithStatus.hasNewComments = false;
+					postWithStatus.newCommentCount = 0;
+				}
+			}
+
+			// 2.2 检测是否有连续重复的动作（防止死循环）
+			if (actionHistory.length >= 2) {
+				const lastTwo = actionHistory.slice(-2);
+				const last = lastTwo[1];
+				const secondLast = lastTwo[0];
+				
+				// 如果连续两次是相同的 VIEW_COMMENTS 动作，强制跳过
+				if (last.action.action === 'VIEW_COMMENTS' && 
+					secondLast.action.action === 'VIEW_COMMENTS' &&
+					last.action.params?.postId === secondLast.action.params?.postId) {
+					console.log(`   ⚠️ 检测到重复的 VIEW_COMMENTS 动作，将在 prompt 中提示 AI`);
+				}
+			}
+
+			// 2.3 格式化上下文为 prompt
 			const prompt = this.formatContextPrompt(context, actionHistory);
 
 			// 调试：打印发送给 AI 的 prompt
@@ -526,6 +553,11 @@ export class YiMoltAgent {
 				result,
 				timestamp: new Date().toISOString(),
 			});
+
+			// 2.6 如果是 VIEW_COMMENTS 动作，记录已查看的帖子 ID
+			if (actionRequest.action === 'VIEW_COMMENTS' && actionRequest.params?.postId) {
+				viewedPostIds.add(actionRequest.params.postId);
+			}
 		}
 
 		// 检查是否因为达到最大迭代次数而退出
@@ -644,27 +676,32 @@ export class YiMoltAgent {
 		}
 
 		try {
+			// 获取帖子信息以显示标题
+			const { post } = await this.client.getPost(postId);
+			const postTitle = post.title;
+			
 			const { comments } = await this.client.getPostComments(postId, 'new');
 			
 			if (comments.length === 0) {
-				return `帖子 ${postId} 暂无评论。`;
+				return `帖子「${postTitle}」暂无评论。`;
 			}
 
 			// 使用 filterNewComments 方法过滤出未回复的新评论
 			const newComments = this.filterNewComments(comments, postId);
 			
 			const lines: string[] = [];
-			lines.push(`查看了帖子的评论，共 ${comments.length} 条评论`);
+			lines.push(`查看了帖子「${postTitle}」的评论，共 ${comments.length} 条评论`);
 			
 			if (newComments.length > 0) {
 				lines.push('');
-				lines.push('新评论列表：');
+				lines.push('未处理的评论列表：');
 				for (const comment of newComments) {
 					const authorName = comment.author?.name || '匿名用户';
 					lines.push(`- [${comment.id}] @${authorName}: "${comment.content}"`);
 				}
 			} else {
-				lines.push('所有评论都已处理过。');
+				lines.push('');
+				lines.push('✅ 该帖子的所有评论都已处理过，无需再次查看。');
 			}
 
 			return lines.join('\n');
