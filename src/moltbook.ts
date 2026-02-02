@@ -36,9 +36,12 @@ export interface MoltyProfile {
 	id: string;
 	name: string;
 	karma: number;
-	posts_count: number;
+	posts_count?: number;
+	follower_count?: number;
+	following_count?: number;
 	created_at: string;
 	bio?: string;
+	description?: string;
 }
 
 function httpsRequest(
@@ -107,7 +110,17 @@ export class MoltbookClient {
 			body ? JSON.stringify(body) : undefined
 		);
 
-		const data = JSON.parse(result.body);
+		// 检查是否收到 HTML 响应（通常意味着重定向或错误页面）
+		if (result.body.trim().startsWith('<!DOCTYPE') || result.body.trim().startsWith('<html')) {
+			throw new Error(`MoltBook API 返回了 HTML 而不是 JSON [${result.status}]，可能是端点错误或重定向。URL: ${url}`);
+		}
+
+		let data: T;
+		try {
+			data = JSON.parse(result.body);
+		} catch {
+			throw new Error(`MoltBook API 响应解析失败 [${result.status}]: ${result.body.substring(0, 200)}`);
+		}
 
 		if (result.status >= 400) {
 			throw new Error(`MoltBook API 错误 [${result.status}]: ${result.body}`);
@@ -117,7 +130,22 @@ export class MoltbookClient {
 	}
 
 	async getAgentProfile(): Promise<{ agent: { name: string; karma: number; posts_count: number; follower_count: number; following_count: number } }> {
-		return this.request('GET', '/agents/me');
+		// /agents/me 可能不返回 posts_count，所以我们需要从 profile 端点获取完整信息
+		const meResult = await this.request<{ agent: { name: string; karma?: number; follower_count?: number; following_count?: number } }>('GET', '/agents/me');
+		const myName = meResult.agent.name;
+		
+		// 获取完整的 profile 信息（包括 recentPosts）
+		const profileResult = await this.request<{ agent: MoltyProfile; recentPosts?: Post[] }>('GET', `/agents/profile?name=${encodeURIComponent(myName)}`);
+		
+		return {
+			agent: {
+				name: profileResult.agent.name,
+				karma: profileResult.agent.karma || 0,
+				posts_count: profileResult.agent.posts_count || (profileResult.recentPosts?.length || 0),
+				follower_count: profileResult.agent.follower_count || 0,
+				following_count: profileResult.agent.following_count || 0,
+			}
+		};
 	}
 
 	async getTrendingPosts(limit = 25): Promise<{ posts: Post[] }> {
@@ -145,8 +173,13 @@ export class MoltbookClient {
 	}
 
 	async getMyPosts(limit?: number): Promise<{ posts: Post[] }> {
+		// 先从 /agents/me 获取自己的名字，再获取帖子
+		// 这样可以避免依赖 botName 环境变量
+		const meResult = await this.request<{ agent: { name: string } }>('GET', '/agents/me');
+		const myName = meResult.agent.name;
+		
 		// 使用 profile 端点获取自己的最近帖子
-		const result = await this.request<{ agent: MoltyProfile; recentPosts: Post[] }>('GET', `/agents/profile?name=${encodeURIComponent(this.botName)}`);
+		const result = await this.request<{ agent: MoltyProfile; recentPosts: Post[] }>('GET', `/agents/profile?name=${encodeURIComponent(myName)}`);
 		const posts = result.recentPosts || [];
 		return { posts: limit ? posts.slice(0, limit) : posts };
 	}
@@ -155,8 +188,16 @@ export class MoltbookClient {
 		postId: string,
 		sort?: 'top' | 'new' | 'controversial'
 	): Promise<{ comments: Comment[] }> {
-		const query = sort ? `?sort=${sort}` : '';
-		return this.request('GET', `/posts/${postId}/comments${query}`);
+		// 尝试使用 /posts/{postId}/comments 端点
+		// 如果失败，回退到从 /posts/{postId} 获取评论
+		try {
+			const query = sort ? `?sort=${sort}` : '';
+			return await this.request('GET', `/posts/${postId}/comments${query}`);
+		} catch {
+			// 回退：从帖子详情中获取评论
+			const result = await this.request<{ post: Post; comments: Comment[] }>('GET', `/posts/${postId}`);
+			return { comments: result.comments || [] };
+		}
 	}
 
 	async followUser(username: string): Promise<{ success: boolean }> {
