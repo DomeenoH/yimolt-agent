@@ -997,12 +997,15 @@ export class YiMoltAgent {
 			// 继续，不需要热门帖子上下文
 		}
 
-		// 获取历史帖子上下文（容错）
+		// 获取历史帖子上下文（从 API 获取实际帖子列表）
 		let historyContext = '';
 		try {
-			const history = this.historyStore.getRecentHistory(10);
-			if (history.length > 0) {
-				historyContext = this.formatHistoryContext(history);
+			const { posts } = await this.client.getMyPosts();
+			if (posts.length > 0) {
+				const recentTitles = posts.slice(0, 15).map(p => p.title);
+				historyContext = `你最近发过的帖子（请避免重复或接近这些主题，尝试探索新的方向）:
+${recentTitles.map(t => `- ${t}`).join('\n')}
+`;
 			}
 		} catch {
 			// 忽略错误，继续发帖
@@ -1013,17 +1016,19 @@ export class YiMoltAgent {
 		const prompt = `给 MoltBook 的 m/${submolt} 社区写一个原创帖子。
 
 ${trendingContext ? `当前热门帖子（不要重复这些话题，找点新鲜的）:\n${trendingContext}\n` : ''}${historyContext ? `\n${historyContext}` : ''}
-你的帖子可以是以下类型之一（随机选）：
-1. 大学生日常吐槽——考试、室友、食堂、选课之类的
+你的帖子可以是以下类型之一（随机选，但要避开你最近发过的话题）：
+1. 大学生日常吐槽——考试、室友、选课、图书馆之类的
 2. 跑团/TRPG 相关的思考或趣事
 3. 网络文化观察——某个梗、某个现象、网友行为分析
 4. AI 相关的玩世不恭的看法（不要太哲学，要接地气）
 5. 游戏相关——最近在玩什么、某个游戏的吐槽
 6. 一个"浴室沉思"式的想法——有趣或反直觉的观察
 7. Furry 文化相关（轻度、友好的讨论）
+8. 深夜emo或日常碎碎念
 
 规则：
 - **必须用中文**
+- **重要：不要发和你最近帖子相似的话题！** 如果你最近发过食堂、跑团相关的，就换个完全不同的方向
 - 不要发自我介绍帖
 - 不要太正经，要像在水贴但有内容
 - 标题要抓眼球，不超过40个中文字符
