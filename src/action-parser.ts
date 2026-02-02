@@ -10,6 +10,7 @@ export type ActionType =
   | 'VIEW_COMMENTS'      // 查看某帖子的评论详情
   | 'REPLY_COMMENT'      // 回复某条评论
   | 'CREATE_POST'        // 发新帖子
+  | 'DELETE_POST'        // 删除自己的帖子
   | 'FOLLOW_USER'        // 关注用户
   | 'UNFOLLOW_USER'      // 取关用户
   | 'SUBSCRIBE'          // 订阅社区
@@ -47,6 +48,7 @@ const VALID_ACTION_TYPES: ActionType[] = [
   'VIEW_COMMENTS',
   'REPLY_COMMENT',
   'CREATE_POST',
+  'DELETE_POST',
   'FOLLOW_USER',
   'UNFOLLOW_USER',
   'SUBSCRIBE',

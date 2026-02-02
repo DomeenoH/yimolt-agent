@@ -216,6 +216,10 @@ export class MoltbookClient {
 		return this.request('DELETE', `/submolts/${submolt}/subscribe`);
 	}
 
+	async deletePost(postId: string): Promise<{ success: boolean }> {
+		return this.request('DELETE', `/posts/${postId}`);
+	}
+
 	async semanticSearch(
 		query: string,
 		type?: 'posts' | 'comments' | 'all',

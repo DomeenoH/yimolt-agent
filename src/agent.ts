@@ -388,6 +388,7 @@ export class YiMoltAgent {
 		if (context.canPost) {
 			lines.push('| CREATE_POST | 发新帖子 | submolt (可选) |');
 		}
+		lines.push('| DELETE_POST | 删除自己的帖子 | postId |');
 		lines.push('| FOLLOW_USER | 关注用户 | username |');
 		lines.push('| UNFOLLOW_USER | 取关用户 | username |');
 		lines.push('| SUBSCRIBE | 订阅社区 | submolt |');
@@ -563,6 +564,9 @@ export class YiMoltAgent {
 			
 			case 'CREATE_POST':
 				return this.executeCreatePost(params.submolt);
+			
+			case 'DELETE_POST':
+				return this.executeDeletePost(params.postId);
 			
 			case 'FOLLOW_USER':
 				return this.executeFollowUser(params.username);
@@ -769,6 +773,29 @@ export class YiMoltAgent {
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			return `❌ 发帖失败: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * 执行 DELETE_POST 动作
+	 * 删除自己的帖子（用于清理 spam 或测试帖子）
+	 */
+	private async executeDeletePost(postId?: string): Promise<string> {
+		if (!postId) {
+			return '❌ 缺少必需参数: postId';
+		}
+
+		try {
+			const { success } = await this.client.deletePost(postId);
+			
+			if (success) {
+				return `✅ 成功删除了帖子 ${postId}`;
+			} else {
+				return `❌ 删除帖子 ${postId} 失败`;
+			}
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `❌ 删除帖子失败: ${errorMessage}`;
 		}
 	}
 
