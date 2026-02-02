@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts",
-    "heartbeat": "tsx src/heartbeat-once.ts"
+    "heartbeat": "tsx src/heartbeat-once.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
-  "dependencies": {},
   "devDependencies": {
+    "fast-check": "^4.5.3",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.18"
   }
 }

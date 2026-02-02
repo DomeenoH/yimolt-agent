@@ -5,6 +5,7 @@
 
 import { MoltbookClient, type Post, type Comment } from './moltbook.js';
 import { type AIProvider } from './ai-provider.js';
+import { PostHistoryStore, type PostHistoryRecord } from './history-store.js';
 import https from 'node:https';
 import http from 'node:http';
 
@@ -25,7 +26,7 @@ async function sendTelegramNotification(title: string, content: string, postUrl:
 		return;
 	}
 
-	const message = `🦞 *小多发帖啦！*\n\n*标题:* ${escapeMarkdown(title)}\n\n*内容:*\n${escapeMarkdown(content)}\n\n[👉 查看帖子](${postUrl})`;
+	const message = `🐙 *小多发帖啦！*\n\n*标题:* ${escapeMarkdown(title)}\n\n*内容:*\n${escapeMarkdown(content)}\n\n[👉 查看帖子](${postUrl})`;
 
 	const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
 	const body = JSON.stringify({
@@ -83,7 +84,7 @@ async function sendNapcatNotification(title: string, content: string, postUrl: s
 	}
 
 	const message = [
-		{ type: 'text', data: { text: `🦞 小多发帖啦！\n\n` } },
+		{ type: 'text', data: { text: `🐙 小多发帖啦！\n\n` } },
 		{ type: 'text', data: { text: `📌 标题: ${title}\n\n` } },
 		{ type: 'text', data: { text: `📝 内容:\n${content}\n\n` } },
 		{ type: 'text', data: { text: `👉 查看帖子: ${postUrl}` } },
@@ -145,6 +146,7 @@ function escapeMarkdown(text: string): string {
 export class YiMoltAgent {
 	private client: MoltbookClient;
 	private ai: AIProvider;
+	private historyStore: PostHistoryStore;
 	private lastPostTime: number = 0;
 
 	private readonly POST_COOLDOWN_MS = 30 * 60 * 1000; // 30 分钟
@@ -152,6 +154,7 @@ export class YiMoltAgent {
 	constructor(config: AgentConfig) {
 		this.client = config.client;
 		this.ai = config.aiProvider;
+		this.historyStore = new PostHistoryStore();
 	}
 
 	canPost(): boolean {
@@ -184,12 +187,22 @@ export class YiMoltAgent {
 			// 继续，不需要热门帖子上下文
 		}
 
+		// 获取历史帖子上下文（容错）
+		let historyContext = '';
+		try {
+			const history = this.historyStore.getRecentHistory(10);
+			if (history.length > 0) {
+				historyContext = this.formatHistoryContext(history);
+			}
+		} catch {
+			// 忽略错误，继续发帖
+		}
+
 		console.log(`📝 正在为 m/${submolt} 生成新帖子...`);
 
 		const prompt = `给 MoltBook 的 m/${submolt} 社区写一个原创帖子。
 
-${trendingContext ? `当前热门帖子（不要重复这些话题，找点新鲜的）:\n${trendingContext}\n` : ''}
-
+${trendingContext ? `当前热门帖子（不要重复这些话题，找点新鲜的）:\n${trendingContext}\n` : ''}${historyContext ? `\n${historyContext}` : ''}
 你的帖子可以是以下类型之一（随机选）：
 1. 大学生日常吐槽——考试、室友、食堂、选课之类的
 2. 跑团/TRPG 相关的思考或趣事
@@ -236,11 +249,39 @@ CONTENT: 帖子正文内容`;
 				sendNapcatNotification(title, content, postUrl),
 			]);
 
+			// 保存历史记录
+			try {
+				this.historyStore.addRecord(title);
+			} catch (error) {
+				console.error('保存历史失败:', error);
+			}
+
 			return post;
 		} catch (error) {
 			console.error('   ❌ 发帖失败:', error);
 			return null;
 		}
+	}
+
+	/**
+	 * 将历史记录格式化为 prompt 可用的字符串
+	 * 包含明确指示 AI 避免这些主题的说明
+	 * 
+	 * @param history 历史记录数组
+	 * @returns 格式化后的字符串，空历史时返回空字符串
+	 */
+	formatHistoryContext(history: PostHistoryRecord[]): string {
+		if (history.length === 0) {
+			return '';
+		}
+
+		const titleList = history
+			.map((record) => `- ${record.title}`)
+			.join('\n');
+
+		return `你最近发过的帖子（请避免重复或接近这些主题，尝试探索新的方向）:
+${titleList}
+`;
 	}
 
 	async heartbeat(): Promise<void> {
