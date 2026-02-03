@@ -96,8 +96,8 @@ export class MoltbookClient {
 		method: string,
 		path: string,
 		body?: Record<string, unknown>,
-		retries = 3,
-		backoff = 1000
+		retries = 10,
+		backoff = 2000
 	): Promise<T> {
 		const url = `${this.baseUrl}${path}`;
 		const headers: Record<string, string> = {
@@ -158,7 +158,7 @@ export class MoltbookClient {
 
 				console.log(`   ⚠️ API 请求不稳定，${backoff}ms 后重试 (${i + 1}/${retries})...`);
 				await new Promise(resolve => setTimeout(resolve, backoff));
-				backoff *= 2; // 指数退避
+				// 移除指数退避，保持固定等待时间
 			}
 		}
 
