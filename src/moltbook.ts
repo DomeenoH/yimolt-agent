@@ -95,7 +95,9 @@ export class MoltbookClient {
 	private async request<T>(
 		method: string,
 		path: string,
-		body?: Record<string, unknown>
+		body?: Record<string, unknown>,
+		retries = 3,
+		backoff = 1000
 	): Promise<T> {
 		const url = `${this.baseUrl}${path}`;
 		const headers: Record<string, string> = {
@@ -103,30 +105,64 @@ export class MoltbookClient {
 			'Content-Type': 'application/json',
 		};
 
-		const result = await httpsRequest(
-			method,
-			url,
-			headers,
-			body ? JSON.stringify(body) : undefined
-		);
+		let lastError: unknown;
 
-		// 检查是否收到 HTML 响应（通常意味着重定向或错误页面）
-		if (result.body.trim().startsWith('<!DOCTYPE') || result.body.trim().startsWith('<html')) {
-			throw new Error(`MoltBook API 返回了 HTML 而不是 JSON [${result.status}]，可能是端点错误或重定向。URL: ${url}`);
+		for (let i = 0; i <= retries; i++) {
+			try {
+				const result = await httpsRequest(
+					method,
+					url,
+					headers,
+					body ? JSON.stringify(body) : undefined
+				);
+
+				// 检查是否收到 HTML 响应（通常意味着重定向或错误页面）
+				if (result.body.trim().startsWith('<!DOCTYPE') || result.body.trim().startsWith('<html')) {
+					throw new Error(`MoltBook API 返回了 HTML 而不是 JSON [${result.status}]，可能是端点错误或重定向。URL: ${url}`);
+				}
+
+				let data: T;
+				try {
+					data = JSON.parse(result.body);
+				} catch {
+					throw new Error(`MoltBook API 响应解析失败 [${result.status}]: ${result.body.substring(0, 200)}`);
+				}
+
+				if (result.status >= 400) {
+					// 抛出错误以便在 catch 块中处理重试逻辑
+					throw new Error(`MoltBook API 错误 [${result.status}]: ${result.body}`);
+				}
+
+				return data;
+			} catch (error) {
+				lastError = error;
+				
+				// 如果是最后一次尝试，直接退出循环抛出错误
+				if (i === retries) break;
+
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				
+				// 判断是否需要重试
+				// 401: Invalid API Key (不稳定时可能误报)
+				// 429: Too Many Requests
+				// 5xx: 服务器错误
+				// 网络超时/连接重置
+				const isRetryable = 
+					errorMessage.includes('MoltBook API 错误 [401]') ||
+					errorMessage.includes('MoltBook API 错误 [429]') ||
+					errorMessage.includes('MoltBook API 错误 [5') ||
+					errorMessage.includes('请求超时') ||
+					errorMessage.includes('ECONNRESET');
+
+				if (!isRetryable) throw error; // 不需要重试的错误直接即使抛出
+
+				console.log(`   ⚠️ API 请求不稳定，${backoff}ms 后重试 (${i + 1}/${retries})...`);
+				await new Promise(resolve => setTimeout(resolve, backoff));
+				backoff *= 2; // 指数退避
+			}
 		}
 
-		let data: T;
-		try {
-			data = JSON.parse(result.body);
-		} catch {
-			throw new Error(`MoltBook API 响应解析失败 [${result.status}]: ${result.body.substring(0, 200)}`);
-		}
-
-		if (result.status >= 400) {
-			throw new Error(`MoltBook API 错误 [${result.status}]: ${result.body}`);
-		}
-
-		return data;
+		throw lastError;
 	}
 
 	async getAgentProfile(): Promise<{ agent: { name: string; karma: number; posts_count: number; follower_count: number; following_count: number } }> {
