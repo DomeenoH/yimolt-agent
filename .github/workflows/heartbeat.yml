@@ -4,13 +4,13 @@ on:
   schedule:
     # 7:00-23:00 每2小时，避开 13:00 和 19:00（由 MaiBot 插件处理）
     # UTC 时间：23:00(7点), 01:00(9点), 03:00(11点), 07:00(15点), 09:00(17点), 13:00(21点), 15:00(23点)
-    - cron: '0 23 * * *'   # 北京时间 7:00
-    - cron: '0 1 * * *'    # 北京时间 9:00
-    - cron: '0 3 * * *'    # 北京时间 11:00
-    - cron: '0 7 * * *'    # 北京时间 15:00
-    - cron: '0 9 * * *'    # 北京时间 17:00
-    - cron: '0 13 * * *'   # 北京时间 21:00
-    - cron: '0 15 * * *'   # 北京时间 23:00
+    - cron: "0 23 * * *" # 北京时间 7:00
+    - cron: "0 1 * * *" # 北京时间 9:00
+    - cron: "0 3 * * *" # 北京时间 11:00
+    - cron: "0 7 * * *" # 北京时间 15:00
+    - cron: "0 9 * * *" # 北京时间 17:00
+    - cron: "0 13 * * *" # 北京时间 21:00
+    - cron: "0 15 * * *" # 北京时间 23:00
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整历史，用于 rebase
+          fetch-depth: 0 # 获取完整历史，用于 rebase
 
       - name: 确保 data 目录是最新的
         run: |
@@ -34,7 +34,7 @@ jobs:
       - name: 配置 Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: 安装依赖
         run: npm install
@@ -58,8 +58,37 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add data/ README.md
-          git diff --staged --quiet || git commit -m "chore: 更新交互状态 [skip ci]"
-          # 推送前先 pull，防止与其他提交冲突
-          git pull --rebase origin main || true
-          git push
+
+          # 暂存所有更改（包括 data/ 和可能的 package-lock.json）
+          git add .
+
+          # 如果没有更改，直接退出
+          git diff --staged --quiet && exit 0
+
+          git commit -m "chore: 更新交互状态 [skip ci]"
+
+          # 尝试拉取最新代码并变基（最多重试3次）
+          MAX_RETRIES=3
+          count=0
+          success=false
+
+          while [ $count -lt $MAX_RETRIES ]; do
+            if git pull --rebase origin main; then
+              if git push; then
+                success=true
+                break
+              fi
+            else
+              # 如果 rebase 失败，尝试中止并重试
+              git rebase --abort || true
+            fi
+            
+            count=$((count + 1))
+            echo "⚠️ Git 操作失败，等待 5s 后重试 ($count/$MAX_RETRIES)..."
+            sleep 5
+          done
+
+          if [ "$success" = false ]; then
+            echo "❌ Git 推送失败，放弃更新状态"
+            exit 1
+          fi
