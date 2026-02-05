@@ -14,6 +14,7 @@ import { ActivityLogStore } from './activity-log.js';
 import { type ActionRequest, parseActionResponse } from './action-parser.js';
 import https from 'node:https';
 import http from 'node:http';
+import { QzoneClient } from './qzone.js';
 
 /**
  * 帖子及其状态变化信息
@@ -150,6 +151,7 @@ async function sendNapcatNotification(title: string, content: string, postUrl: s
 		message: message,
 	});
 
+
 	return new Promise((resolve) => {
 		const urlObj = new URL(`${apiUrl}/send_group_msg`);
 		const isHttps = urlObj.protocol === 'https:';
@@ -192,6 +194,16 @@ async function sendNapcatNotification(title: string, content: string, postUrl: s
 		req.write(body);
 		req.end();
 	});
+}
+
+/**
+ * 发送 Qzone 说说
+ */
+async function sendQzoneNotification(title: string, content: string): Promise<void> {
+    const client = new QzoneClient();
+    // 格式要求：标题后面不换行，逗号然后接正文
+    const shuoshuoContent = `【${title}】，${content}`;
+    await client.publishShuoshuo(shuoshuoContent);
 }
 
 function escapeMarkdown(text: string): string {
@@ -1250,6 +1262,7 @@ CONTENT: 帖子正文内容`;
 			await Promise.all([
 				sendTelegramNotification(title, content, postUrl),
 				sendNapcatNotification(title, content, postUrl),
+				sendQzoneNotification(title, content),
 			]);
 
 			// 保存历史记录
