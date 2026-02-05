@@ -275,6 +275,9 @@ async function build() {
     template = template.replaceAll('<!-- FOLLOWING -->', profile.following.toString());
 
     // 注入内容
+    // Cache Busting for CSS
+    template = template.replace('href="style.css"', `href="style.css?v=${Date.now()}"`);
+    
     template = template.replace('<!-- CONTENT_PLACEHOLDER -->', htmlContent);
     template = template.replace('<!-- TIME_PLACEHOLDER -->', new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }));
 
