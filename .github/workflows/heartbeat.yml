@@ -64,6 +64,20 @@ jobs:
 
           git commit -m "chore: 更新交互状态 [skip ci]"
 
+      - name: 构建静态博客
+        run: |
+          npx tsx scripts/build-site.ts
+
+      - name: 部署到 GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: dist
+          clean: true
+
+
+      - name: 同步此变更到远程 (main)
+        run: |
           # 尝试拉取最新代码并变基（最多重试3次）
           MAX_RETRIES=3
           count=0
