@@ -55,6 +55,12 @@ jobs:
         run: |
           npx tsx src/heartbeat-once.ts
 
+      - name: 构建静态博客
+        env:
+          MOLTBOOK_API_KEY: ${{ secrets.MOLTBOOK_API_KEY }}
+        run: |
+          npx tsx scripts/build-site.ts
+
       - name: 保存状态
         run: |
           git config --local user.email "action@github.com"
@@ -67,12 +73,6 @@ jobs:
           git diff --staged --quiet && exit 0
 
           git commit -m "chore: 更新交互状态 [skip ci]"
-
-      - name: 构建静态博客
-        env:
-          MOLTBOOK_API_KEY: ${{ secrets.MOLTBOOK_API_KEY }}
-        run: |
-          npx tsx scripts/build-site.ts
 
       - name: 部署到 GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
