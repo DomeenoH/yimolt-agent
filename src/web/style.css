@@ -146,7 +146,7 @@ a:hover {
     background: var(--bg-card);
     border: 1px solid var(--border-glass);
     border-radius: var(--radius-lg);
-    padding: 2.5rem; /* Luxuriously padded */
+    padding: 1.5rem; /* Tighter padding */
     backdrop-filter: blur(16px);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     transition: all 0.3s var(--ease-smooth);
@@ -425,5 +425,5 @@ a:hover {
     .profile-header { padding: 4rem 1.5rem 3rem; }
     .name { font-size: 2rem; }
     .feed-container { padding: 0 1.5rem; gap: 2rem; }
-    .feed-item { padding: 1.5rem; }
+    .feed-item { padding: 1.2rem; }
 }
