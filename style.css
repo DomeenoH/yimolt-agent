@@ -65,19 +65,19 @@ a:hover {
 /* --- Profile Header (Top) --- */
 .profile-header {
     text-align: center;
-    padding: 6rem 2rem 4rem; /* Increased top/bottom padding */
+    padding: 6rem 1rem 4rem; /* Balanced */
     position: relative;
-    max-width: 680px;
+    max-width: 560px;
     margin: 0 auto;
 }
 
 .avatar {
-    width: 96px; /* Slightly larger */
-    height: 96px;
+    width: 110px; /* Larger */
+    height: 110px;
     border-radius: 50%;
     border: 3px solid var(--bg-app);
     box-shadow: 0 0 0 2px var(--border-glass), 0 8px 24px rgba(0,0,0,0.5);
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
     transition: transform 0.3s var(--ease-elastic);
 }
 
@@ -86,19 +86,19 @@ a:hover {
 }
 
 .name {
-    font-size: 2.5rem; /* Larger Title */
+    font-size: 2.5rem;
     font-weight: 700;
     letter-spacing: -0.04em;
     background: linear-gradient(to bottom right, #fff, #a1a1aa);
     -webkit-background-clip: text;
     color: transparent;
-    margin-bottom: 0.8rem;
+    margin-bottom: 1rem;
 }
 
 .bio {
     color: var(--text-secondary);
-    font-size: 1.1rem; /* Readable bio */
-    line-height: 1.6;
+    font-size: 1.1rem;
+    line-height: 1.8; /* Relaxed reading */
     padding: 0 1rem;
 }
 
@@ -107,13 +107,13 @@ a:hover {
     display: flex;
     justify-content: center;
     gap: 1.5rem;
-    margin-top: 2rem;
+    margin-top: 2.5rem;
 }
 
 .stat-pill {
     background: var(--bg-card);
     border: 1px solid var(--border-glass);
-    padding: 0.5rem 1.2rem; /* Larger pills */
+    padding: 0.6rem 1.4rem;
     border-radius: 24px;
     font-size: 0.9rem;
     color: var(--text-secondary);
@@ -132,13 +132,13 @@ a:hover {
 
 /* --- Feed Container --- */
 .feed-container {
-    max-width: 680px; /* Match header width */
+    max-width: 560px; /* Narrower for focus */
     margin: 0 auto;
-    padding: 0 2rem; /* More breathing room on sides */
+    padding: 0 2rem; 
     display: flex;
     flex-direction: column;
-    gap: 2rem; /* More space between cards */
-    padding-bottom: 8rem; /* Bottom clearance */
+    gap: 6rem; /* Wide vertical separation */
+    padding-bottom: 15rem;
 }
 
 /* --- Feed Item Card --- */
@@ -146,7 +146,7 @@ a:hover {
     background: var(--bg-card);
     border: 1px solid var(--border-glass);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: 1.5rem; /* Tighter padding */
     backdrop-filter: blur(16px);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     transition: all 0.3s var(--ease-smooth);
@@ -157,20 +157,20 @@ a:hover {
 
 .feed-item:hover {
     border-color: var(--border-glass-hover);
-    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3); 
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.4); 
 }
 
 /* Header */
 .feed-header {
     display: flex;
     align-items: center;
-    gap: 0.8rem;
-    margin-bottom: 1rem;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .feed-avatar {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     border: 1px solid var(--border-glass);
 }
@@ -181,18 +181,19 @@ a:hover {
 }
 
 .feed-author {
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--text-primary);
     line-height: 1.2;
 }
 
 .feed-time {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
     display: flex;
     align-items: center;
     gap: 0.3rem;
+    margin-top: 0.2rem;
 }
 
 .feed-time svg {
@@ -203,23 +204,23 @@ a:hover {
 
 /* Body & Content */
 .feed-title {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
     font-weight: 700;
-    margin: 0 0 0.8rem 0;
+    margin: 0 0 1rem 0;
     line-height: 1.3;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
 }
 
 .feed-content-wrapper {
     position: relative;
-    font-size: 0.95rem;
+    font-size: 1.05rem; /* Larger font */
     color: var(--text-secondary);
-    line-height: 1.7;
+    line-height: 1.8; /* More breath */
     transition: max-height 0.4s var(--ease-smooth);
 }
 
 .feed-content p {
-    margin-bottom: 1em;
+    margin-bottom: 1.5em; /* Paragraph separation */
 }
 
 /* Collapsed State Logic */
@@ -421,7 +422,8 @@ a:hover {
 
 /* Mobile Tweak */
 @media (max-width: 640px) {
-    .profile-header { padding: 2rem 1rem; }
-    .name { font-size: 1.5rem; }
+    .profile-header { padding: 4rem 1.5rem 3rem; }
+    .name { font-size: 2rem; }
+    .feed-container { padding: 0 1.5rem; gap: 2rem; }
     .feed-item { padding: 1.2rem; }
 }
