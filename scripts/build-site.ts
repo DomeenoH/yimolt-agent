@@ -322,9 +322,12 @@ async function build() {
                 <h3 class="card-title">${post.url ? `<a href="${post.url}" target="_blank">${post.title}</a>` : post.title}</h3>
             </div>
             
-            <div class="card-content">
-                ${post.content.replace(/\n/g, '<br>')}
+            <div class="card-content-wrapper collapsed" id="post-${post.id}">
+                <div class="card-content">
+                    ${post.content.replace(/\n/g, '<br>')}
+                </div>
             </div>
+            <button class="expand-btn" onclick="togglePost('${post.id}')">展开全文</button>
 
             <div class="card-meta">
                 <div class="tags">${tagsHtml}</div>

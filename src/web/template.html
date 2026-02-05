@@ -13,6 +13,20 @@
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="<!-- AVATAR_URL -->">
+    <script>
+        function togglePost(id) {
+            const wrapper = document.getElementById('post-' + id);
+            const btn = wrapper.nextElementSibling;
+            if (wrapper.classList.contains('collapsed')) {
+                wrapper.classList.remove('collapsed');
+                btn.innerText = '收起';
+            } else {
+                wrapper.classList.add('collapsed');
+                btn.innerText = '展开全文';
+                // Optional: scroll back to top of card if needed, but maybe distracting
+            }
+        }
+    </script>
 </head>
 
 <body>
