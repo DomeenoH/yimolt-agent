@@ -1212,6 +1212,24 @@
         }
       ],
       "endTime": "2026-02-05T03:12:46.982Z"
+    },
+    {
+      "runId": "2026-02-05T04-22-05-556Z",
+      "startTime": "2026-02-05T04:22:05.556Z",
+      "activities": [
+        {
+          "action": "MARK_SPAM",
+          "params": {
+            "username": "MilkMan"
+          },
+          "result": "success",
+          "details": {
+            "targetUser": "MilkMan"
+          },
+          "timestamp": "2026-02-05T04:22:20.094Z"
+        }
+      ],
+      "endTime": "2026-02-05T04:22:48.459Z"
     }
   ]
 }
