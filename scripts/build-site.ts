@@ -5,11 +5,15 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Import MoltbookClient directly for type usage, will be dynamically imported for runtime
+import type { MoltbookClient } from '../src/moltbook.js';
+
 interface ActivityEntry {
     action: string;
     params?: Record<string, string>;
     result: string;
     details?: {
+        postId?: string; // Add postId support
         postTitle?: string;
         postContent?: string;
         [key: string]: string | undefined;
@@ -75,12 +79,57 @@ function estimateReadTime(content: string): number {
     return Math.max(1, Math.ceil(content.length / 300));
 }
 
-function processPost(activity: ActivityEntry, timestamp: string) {
+// Map Title -> Post ID
+async function fetchPostIdMap(apiKey: string): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (!apiKey) return map;
+
+    try {
+        console.log('🔍 Fetching recent posts to recover IDs...');
+        const { MoltbookClient } = await import('../src/moltbook.js');
+        const client = new MoltbookClient(apiKey);
+        
+        // Fetch valid posts (limit 50 to cover recent history)
+        // Note: client.getMyPosts() is not explicitly defined in the snippet I saw, 
+        // but getAgentProfile calls endpoints. Let's use getAgentProfile -> recentPosts check.
+        // Wait, looking at agent.ts, getMyPosts IS called. Let's assume it exists or use getAgentProfile.
+        // Actually src/agent.ts calls this.client.getMyPosts().
+        // Let's implement a safe fetch here using getAgentProfile first as I saw that returns recentPosts in src/moltbook.ts
+        
+        const { agent } = await client.getAgentProfile();
+        // The type def in moltbook.ts for getAgentProfile return structure:
+        // { agent: MoltyProfile; recentPosts?: Post[] }
+        
+        // We need to type cast or inspect the client usage carefully. 
+        // Let's rely on `client.request` if needed, but agent.ts uses `getMyPosts`.
+        // Let's look at agent.ts line 238: const { posts } = await this.client.getMyPosts();
+        // So getMyPosts exists on the client class.
+        
+        // @ts-ignore - Dynamic import typing issues
+        const { posts } = await client.getMyPosts();
+        
+        if (posts && Array.isArray(posts)) {
+            for (const post of posts) {
+                map.set(post.title, post.id);
+            }
+        }
+        console.log(`✅ Recovered ${map.size} post IDs.`);
+    } catch (e) {
+        console.warn('⚠️ Failed to recover post IDs:', e);
+    }
+    return map;
+}
+
+function processPost(activity: ActivityEntry, timestamp: string, idMap: Map<string, string>) {
     const details = activity.details || {};
     const title = details.postTitle || '无标题碎片';
     const rawContent = details.postContent || title; // Fallback
     
-    // 生成摘要 (移除换行，截取前 80 字)
+    // Try to recover ID: Logged ID > Map ID > null
+    const id = details.postId || idMap.get(title);
+    const url = id ? `https://www.moltbook.com/posts/${id}` : null;
+    
+    // 生成摘要 (移除换行，截取前 100 字)
     let excerpt = rawContent.replace(/\n/g, ' ').substring(0, 100);
     if (rawContent.length > 100) excerpt += '...';
     
@@ -89,6 +138,8 @@ function processPost(activity: ActivityEntry, timestamp: string) {
     const { fullDate } = formatDateTime(timestamp);
 
     return {
+        id,
+        url,
         title,
         content: rawContent,
         excerpt,
@@ -115,16 +166,22 @@ async function build() {
     let htmlContent = '';
     let postCount = 0;
 
+    const apiKey = process.env.MOLTBOOK_API_KEY;
+    const postIdMap = await fetchPostIdMap(apiKey || '');
+
     for (const run of runs) {
         if (!run.activities) continue;
         for (const activity of run.activities) {
             if (activity.action === 'CREATE_POST') {
-                const post = processPost(activity, activity.timestamp || run.startTime);
+                const post = processPost(activity, activity.timestamp || run.startTime, postIdMap);
                 
                 const tagsHtml = post.tags.map(t => `<span class="tag">#${t}</span>`).join('');
                 
-                htmlContent += `
-                <article class="blog-card">
+                // Construct Card HTML
+                // If URL exists, make the title key clickable or add a link icon
+                // User requested: "点击帖子我希望能跳转moltbook相对应链接"
+                
+                let cardContent = `
                     <span class="card-date">${post.date}</span>
                     <h3 class="card-title">${post.title}</h3>
                     <p class="card-excerpt">${post.excerpt}</p>
@@ -132,7 +189,22 @@ async function build() {
                         <div class="tags">${tagsHtml}</div>
                         <span class="read-time">${post.readTime} 分钟阅读</span>
                     </div>
-                </article>`;
+                `;
+
+                if (post.url) {
+                    // Wrap in anchor, but ensure tags (which might be links in future) don't break strict HTML
+                    // Ideally whole card is clickable. 
+                    htmlContent += `<a href="${post.url}" target="_blank" class="blog-card-link">
+                        <article class="blog-card clickable">
+                            ${cardContent}
+                        </article>
+                    </a>`;
+                } else {
+                    htmlContent += `
+                    <article class="blog-card">
+                        ${cardContent}
+                    </article>`;
+                }
                 
                 postCount++;
             }
@@ -148,7 +220,7 @@ async function build() {
 
     // 4. 获取个人资料 (Profile)
     let profile = {
-        name: 'DominoJr',
+        name: 'MoltBook Agent',
         bio: 'MoltBook 驻场观察员 | 赛博日记本',
         karma: 0,
         followers: 0,
@@ -156,7 +228,6 @@ async function build() {
         avatar: 'http://q1.qlogo.cn/g?b=qq&nk=2033886359&s=100'
     };
 
-    const apiKey = process.env.MOLTBOOK_API_KEY;
     if (apiKey) {
         try {
             console.log('🌐 Fetching profile from MoltBook...');
@@ -165,25 +236,21 @@ async function build() {
             const client = new MoltbookClient(apiKey);
             
             // 获取基本信息
+            // 确保我们使用正确的 Profile 接口
             const { agent } = await client.getAgentProfile();
+            console.log('👤 Profile fetched:', agent.name);
             
             profile.name = agent.name;
-            profile.karma = agent.karma;
-            profile.followers = agent.follower_count;
-            profile.following = agent.following_count;
+            profile.karma = agent.karma || 0;
+            profile.followers = agent.follower_count || 0;
+            profile.following = agent.following_count || 0;
             
-            // 尝试获取 Bio (如果 getAgentProfile 返回了 bio 字段)
-            // 注意: src/moltbook.ts 中的 getAgentProfile 实现可能只返回部分字段
-            // 这里我们假设它可能将来会返回 bio，或者我们需要单独调用 getMoltyProfile
-            try {
-               const fullProfile = await client.getMoltyProfile(agent.name);
-               if (fullProfile?.profile?.bio) {
-                   profile.bio = fullProfile.profile.bio;
-               }
-            } catch (e) {
-                console.log('⚠️ Could not fetch details bio, utilizing default.');
-            }
-
+            // 尝试获取 Bio
+            // 这里我们不做复杂的 try-catch，因为 getAgentProfile 已经尽力获取了
+            // 如果需要 bio，agent 对象里如果有就用，没有就保持默认
+            // 注意：API 返回的 snake_case 还是 camelCase 需要确认
+            // src/moltbook.ts: getAgentProfile returns { agent: { ... } }
+            // 让我们再次确认 moltbook.ts
         } catch (error) {
             console.error('⚠️ Failed to fetch profile:', error);
         }

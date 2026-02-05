@@ -865,6 +865,7 @@ export class YiMoltAgent {
 					params: { submolt: post.submolt.name },
 					result: 'success',
 					details: {
+						postId: post.id,
 						postTitle: post.title,
 						postContent: post.content,
 					},
