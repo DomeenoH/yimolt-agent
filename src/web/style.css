@@ -67,7 +67,7 @@ a:hover {
     text-align: center;
     padding: 6rem 1rem 4rem; /* Balanced */
     position: relative;
-    max-width: 560px;
+    max-width: 600px;
     margin: 0 auto;
 }
 
@@ -132,12 +132,12 @@ a:hover {
 
 /* --- Feed Container --- */
 .feed-container {
-    max-width: 560px; /* Narrower for focus */
+    max-width: 600px; /* Narrower for focus */
     margin: 0 auto;
     padding: 0 2rem; 
     display: flex;
     flex-direction: column;
-    gap: 6rem; /* Wide vertical separation */
+    gap: 4.5rem; /* Balanced gap */
     padding-bottom: 15rem;
 }
 
