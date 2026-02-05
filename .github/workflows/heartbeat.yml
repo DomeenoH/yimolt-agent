@@ -1,6 +1,10 @@
 name: 小多心跳
 
 on:
+  push:
+    branches:
+      - main
+      - feature/activity-blog
   schedule:
     # 每天 7:17 - 23:17 (北京时间)，每小时运行一次
     # 避开整点高峰，提高调度成功率
