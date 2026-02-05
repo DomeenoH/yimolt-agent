@@ -202,7 +202,7 @@ async function sendNapcatNotification(title: string, content: string, postUrl: s
 async function sendQzoneNotification(title: string, content: string): Promise<void> {
     const client = new QzoneClient();
     // 格式要求：标题后面不换行，逗号然后接正文
-    const shuoshuoContent = `【${title}】，${content}`;
+    const shuoshuoContent = `${title}，${content}`;
     await client.publishShuoshuo(shuoshuoContent);
 }
 
