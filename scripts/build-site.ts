@@ -195,11 +195,11 @@ async function build() {
     let template = fs.readFileSync(TEMPLATE_FILE, 'utf-8');
     
     // 注入 Profile 数据
-    template = template.replace('<!-- AVATAR_URL -->', profile.avatar);
-    template = template.replace('<!-- BIO_TEXT -->', profile.bio);
-    template = template.replace('<!-- KARMA -->', profile.karma.toString());
-    template = template.replace('<!-- FOLLOWERS -->', profile.followers.toString());
-    template = template.replace('<!-- FOLLOWING -->', profile.following.toString());
+    template = template.replaceAll('<!-- AVATAR_URL -->', profile.avatar);
+    template = template.replaceAll('<!-- BIO_TEXT -->', profile.bio);
+    template = template.replaceAll('<!-- KARMA -->', profile.karma.toString());
+    template = template.replaceAll('<!-- FOLLOWERS -->', profile.followers.toString());
+    template = template.replaceAll('<!-- FOLLOWING -->', profile.following.toString());
 
     // 注入内容
     template = template.replace('<!-- CONTENT_PLACEHOLDER -->', htmlContent);
