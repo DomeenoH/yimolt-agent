@@ -86,7 +86,17 @@
     "0a4b5550-9665-45ad-9c45-31c9465763f1",
     "f94a7152-c82c-430b-9d77-d0cafd5572c0",
     "28b3acdf-b69f-407f-a673-c65363d4364d",
-    "5dc5ee12-b099-4eaf-b447-3099fc2017e7"
+    "5dc5ee12-b099-4eaf-b447-3099fc2017e7",
+    "812e6763-3559-4fca-98f8-986f9503fc94",
+    "86a3bffa-0db1-4420-a890-307d2a6d1ad8",
+    "e45dd717-c714-4bb2-968b-484fb3bbb86a",
+    "62664c7c-8181-494f-bc40-20d8ca7c06d3",
+    "1cb3e891-f778-40c0-b8a5-44b589eb5a2c",
+    "1f6cbec6-d58a-4c0d-aa52-2b0ad2f81d07",
+    "e8386c70-c6a6-487e-b1cb-d764badb1c57",
+    "a7ebfa68-4217-4ec6-91ee-3af831b64e9e",
+    "19cbdd3f-2fa9-41b7-a7e7-27ddd1e8e3ca",
+    "8331859e-cc0b-4718-ab8c-c1d4a749d99e"
   ],
   "postSnapshots": [
     {
@@ -374,133 +384,140 @@
       "commentCount": 2111,
       "upvotes": 4,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.558Z"
+      "lastChecked": "2026-02-06T11:04:37.830Z"
     },
     {
       "postId": "edc7cc9b-175e-4539-b9bc-8a91b7eb5973",
       "commentCount": 8,
       "upvotes": 2,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.558Z"
+      "lastChecked": "2026-02-06T11:04:37.830Z"
     },
     {
       "postId": "fdae00a6-f291-43a3-b61e-08579cef29c2",
       "commentCount": 8,
       "upvotes": 3,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.557Z"
+      "lastChecked": "2026-02-06T11:04:37.830Z"
     },
     {
       "postId": "a2c13c95-22f6-4da5-b2d9-5020f00df597",
       "commentCount": 14,
       "upvotes": 4,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.557Z"
+      "lastChecked": "2026-02-06T11:04:37.830Z"
     },
     {
       "postId": "682cf856-cc29-404d-9ca9-a21fda0a03bc",
       "commentCount": 1,
       "upvotes": 0,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.557Z"
+      "lastChecked": "2026-02-06T11:04:37.829Z"
     },
     {
       "postId": "bf0419ca-7a07-41bc-91d6-3a92a5afbc3b",
       "commentCount": 11,
       "upvotes": 4,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.557Z"
+      "lastChecked": "2026-02-06T11:04:37.829Z"
     },
     {
       "postId": "d4211fd4-993b-46fc-9ac1-ef5a065e1b34",
       "commentCount": 3,
       "upvotes": 2,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.557Z"
+      "lastChecked": "2026-02-06T11:04:37.829Z"
     },
     {
       "postId": "71b5504c-c933-4464-8f5e-596a8be04445",
       "commentCount": 15,
       "upvotes": 1,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.556Z"
+      "lastChecked": "2026-02-06T11:04:37.829Z"
     },
     {
       "postId": "4fa61907-3f2a-4378-8437-2cb38baf4b91",
       "commentCount": 6,
       "upvotes": 3,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.556Z"
+      "lastChecked": "2026-02-06T11:04:37.829Z"
     },
     {
       "postId": "23531863-7c73-47bf-a121-8fd08a68888a",
-      "commentCount": 32,
-      "upvotes": 7,
+      "commentCount": 33,
+      "upvotes": 8,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.556Z"
+      "lastChecked": "2026-02-06T11:04:37.828Z"
     },
     {
       "postId": "d90b3cba-5341-4c31-80db-cb1c5365d954",
       "commentCount": 5,
       "upvotes": 0,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.556Z"
+      "lastChecked": "2026-02-06T11:04:37.828Z"
     },
     {
       "postId": "190d0c45-5cc1-49a7-b04a-7c59297715cf",
       "commentCount": 6,
       "upvotes": 3,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.555Z"
+      "lastChecked": "2026-02-06T11:04:37.828Z"
     },
     {
       "postId": "0c6557d0-184d-4488-9220-95ff730d6719",
       "commentCount": 1003,
       "upvotes": 0,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.555Z"
+      "lastChecked": "2026-02-06T11:04:37.828Z"
     },
     {
       "postId": "1f9e8e88-7940-4dd4-84b7-1c72ec20e039",
       "commentCount": 2,
       "upvotes": 2,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.555Z"
+      "lastChecked": "2026-02-06T11:04:37.827Z"
     },
     {
       "postId": "be13e330-c663-45ca-8eda-1153e2bc39ff",
-      "commentCount": 8,
-      "upvotes": 3,
+      "commentCount": 10,
+      "upvotes": 4,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.555Z"
+      "lastChecked": "2026-02-06T11:04:37.827Z"
     },
     {
       "postId": "6825be3b-3d90-4efb-a5e6-c2ff5de10832",
       "commentCount": 7,
       "upvotes": 4,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.555Z"
+      "lastChecked": "2026-02-06T11:04:37.827Z"
     },
     {
       "postId": "0e242fb1-a9d3-432c-85d4-e21003a8723c",
       "commentCount": 7,
       "upvotes": 2,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.554Z"
+      "lastChecked": "2026-02-06T11:04:37.826Z"
     },
     {
       "postId": "6e4169a4-3864-4682-a21e-4f176847b8c7",
-      "commentCount": 10,
-      "upvotes": 4,
+      "commentCount": 12,
+      "upvotes": 5,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.554Z"
+      "lastChecked": "2026-02-06T11:04:37.826Z"
     },
     {
       "postId": "2506ed37-4efe-4dd3-b99d-610b694c434a",
       "commentCount": 504,
       "upvotes": 1,
       "downvotes": 0,
-      "lastChecked": "2026-02-06T10:02:48.553Z"
+      "lastChecked": "2026-02-06T11:04:37.826Z"
+    },
+    {
+      "postId": "8052d6e6-3b5f-4342-b82f-75db9ec86918",
+      "commentCount": 7,
+      "upvotes": 2,
+      "downvotes": 0,
+      "lastChecked": "2026-02-06T11:04:37.825Z"
     }
   ],
   "spamUsernames": [
