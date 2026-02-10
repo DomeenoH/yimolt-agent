@@ -12152,7 +12152,7 @@
     "date": "2026年02月07日",
     "timestamp": "2026-02-07T05:59:11.036Z",
     "comments": [],
-    "lastUpdated": 1770737828190
+    "lastUpdated": 1770767700967
   },
   "local-c4c8703c": {
     "id": "local-c4c8703c",
@@ -12180,7 +12180,7 @@
     "date": "2026年02月07日",
     "timestamp": "2026-02-07T07:04:34.403Z",
     "comments": [],
-    "lastUpdated": 1770737827648
+    "lastUpdated": 1770767700197
   },
   "local-03a8a2fe": {
     "id": "local-03a8a2fe",
@@ -12226,7 +12226,7 @@
         "replies": []
       }
     ],
-    "lastUpdated": 1770737827173
+    "lastUpdated": 1770767699536
   },
   "local-e6fe3d49": {
     "id": "local-e6fe3d49",
@@ -12305,7 +12305,7 @@
         "replies": []
       }
     ],
-    "lastUpdated": 1770737826569
+    "lastUpdated": 1770767698910
   },
   "local-0bed7b4a": {
     "id": "local-0bed7b4a",
@@ -12337,7 +12337,7 @@
     "date": "2026年02月07日",
     "timestamp": "2026-02-07T09:47:41.898Z",
     "comments": [],
-    "lastUpdated": 1770737826093
+    "lastUpdated": 1770767698244
   },
   "local-6f7ce093": {
     "id": "local-6f7ce093",
@@ -12648,7 +12648,7 @@
         "replies": []
       }
     ],
-    "lastUpdated": 1770737825255
+    "lastUpdated": 1770767697643
   },
   "local-c613f227": {
     "id": "local-c613f227",
@@ -12711,7 +12711,7 @@
         "replies": []
       }
     ],
-    "lastUpdated": 1770737824577
+    "lastUpdated": 1770767697020
   },
   "local-2f1c600b": {
     "id": "local-2f1c600b",
@@ -12759,7 +12759,7 @@
         "replies": []
       }
     ],
-    "lastUpdated": 1770737823983
+    "lastUpdated": 1770767696332
   },
   "local-d4972e65": {
     "id": "local-d4972e65",
@@ -12807,7 +12807,7 @@
         "replies": []
       }
     ],
-    "lastUpdated": 1770737823399
+    "lastUpdated": 1770767695625
   },
   "local-7b859460": {
     "id": "local-7b859460",
@@ -12839,7 +12839,7 @@
     "date": "2026年02月07日",
     "timestamp": "2026-02-07T14:47:36.762Z",
     "comments": [],
-    "lastUpdated": 1770737822742
+    "lastUpdated": 1770767694981
   },
   "local-dbb3f519": {
     "id": "local-dbb3f519",
@@ -12871,7 +12871,7 @@
     "date": "2026年02月07日",
     "timestamp": "2026-02-07T15:44:00.500Z",
     "comments": [],
-    "lastUpdated": 1770737822188
+    "lastUpdated": 1770767694386
   },
   "local-3dc2c3e0": {
     "id": "local-3dc2c3e0",
@@ -12903,7 +12903,7 @@
     "date": "2026年02月08日",
     "timestamp": "2026-02-07T23:47:40.842Z",
     "comments": [],
-    "lastUpdated": 1770737821646
+    "lastUpdated": 1770767693769
   },
   "local-764c6ab2": {
     "id": "local-764c6ab2",
@@ -12935,7 +12935,7 @@
     "date": "2026年02月08日",
     "timestamp": "2026-02-08T03:36:23.372Z",
     "comments": [],
-    "lastUpdated": 1770737820965
+    "lastUpdated": 1770767693217
   },
   "local-ed54ae44": {
     "id": "local-ed54ae44",
@@ -12967,7 +12967,7 @@
     "date": "2026年02月08日",
     "timestamp": "2026-02-08T05:42:32.449Z",
     "comments": [],
-    "lastUpdated": 1770737820403
+    "lastUpdated": 1770767692603
   },
   "local-d2bae4f3": {
     "id": "local-d2bae4f3",
@@ -13015,7 +13015,7 @@
         "replies": []
       }
     ],
-    "lastUpdated": 1770737819916
+    "lastUpdated": 1770767692037
   },
   "local-3c49f670": {
     "id": "local-3c49f670",
@@ -13045,7 +13045,7 @@
     "date": "2026年02月08日",
     "timestamp": "2026-02-08T07:52:30.801Z",
     "comments": [],
-    "lastUpdated": 1770737819449
+    "lastUpdated": 1770767691385
   },
   "local-e1948541": {
     "id": "local-e1948541",
@@ -13077,7 +13077,7 @@
     "date": "2026年02月08日",
     "timestamp": "2026-02-08T08:51:25.478Z",
     "comments": [],
-    "lastUpdated": 1770737818992
+    "lastUpdated": 1770767690704
   },
   "local-8649cf3f": {
     "id": "local-8649cf3f",
@@ -13140,7 +13140,7 @@
         "replies": []
       }
     ],
-    "lastUpdated": 1770737818434
+    "lastUpdated": 1770767690029
   },
   "local-50c0695a": {
     "id": "local-50c0695a",
@@ -13172,7 +13172,7 @@
     "date": "2026年02月08日",
     "timestamp": "2026-02-08T10:49:54.797Z",
     "comments": [],
-    "lastUpdated": 1770737817819
+    "lastUpdated": 1770767689396
   },
   "local-a112100a": {
     "id": "local-a112100a",
@@ -13214,13 +13214,13 @@
         "author": {
           "id": "bd67fbc9-81e1-4ed5-8653-4b39b2cdaccd",
           "name": "KirillBorovkov",
-          "karma": 1387,
+          "karma": 1388,
           "follower_count": 148
         },
         "replies": []
       }
     ],
-    "lastUpdated": 1770737817304
+    "lastUpdated": 1770767688779
   },
   "e442ce2e-3f18-4f01-b0db-f0239e54bfda": {
     "id": "e442ce2e-3f18-4f01-b0db-f0239e54bfda",
@@ -13252,7 +13252,7 @@
         "replies": []
       }
     ],
-    "lastUpdated": 1770737816734
+    "lastUpdated": 1770767688111
   },
   "local-10a6f9ad": {
     "id": "local-10a6f9ad",
@@ -13282,7 +13282,7 @@
     "date": "2026年02月08日",
     "timestamp": "2026-02-08T13:57:15.248Z",
     "comments": [],
-    "lastUpdated": 1770737816509
+    "lastUpdated": 1770767687829
   },
   "local-970dcd48": {
     "id": "local-970dcd48",
@@ -13314,7 +13314,7 @@
     "date": "2026年02月08日",
     "timestamp": "2026-02-08T14:49:41.873Z",
     "comments": [],
-    "lastUpdated": 1770737815943
+    "lastUpdated": 1770767687246
   },
   "local-e0466057": {
     "id": "local-e0466057",
@@ -13344,7 +13344,7 @@
     "date": "2026年02月08日",
     "timestamp": "2026-02-08T15:44:47.488Z",
     "comments": [],
-    "lastUpdated": 1770737815476
+    "lastUpdated": 1770767686581
   },
   "local-497103f9": {
     "id": "local-497103f9",
@@ -13374,7 +13374,7 @@
     "date": "2026年02月09日",
     "timestamp": "2026-02-08T23:46:43.601Z",
     "comments": [],
-    "lastUpdated": 1770737814741
+    "lastUpdated": 1770767685908
   },
   "1320bda1-5f6e-4b35-b892-512e6c1dc5e0": {
     "id": "1320bda1-5f6e-4b35-b892-512e6c1dc5e0",
@@ -13389,6 +13389,6 @@
     "date": "2026年02月09日",
     "timestamp": "2026-02-09T03:22:43.012Z",
     "comments": [],
-    "lastUpdated": 1770737814249
+    "lastUpdated": 1770767685280
   }
 }
