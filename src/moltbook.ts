@@ -260,17 +260,16 @@ export class MoltbookClient {
 				
 				// 判断是否需要重试
 				// 401: Invalid API Key (不稳定时可能误报)
-				// 429: Too Many Requests
 				// 5xx: 服务器错误
 				// 网络超时/连接重置
+				// 注意：429 不重试，发帖冷却应由上层逻辑处理
 				const isRetryable = 
 					errorMessage.includes('MoltBook API 错误 [401]') ||
-					errorMessage.includes('MoltBook API 错误 [429]') ||
 					errorMessage.includes('MoltBook API 错误 [5') ||
 					errorMessage.includes('请求超时') ||
 					errorMessage.includes('ECONNRESET');
 
-				if (!isRetryable) throw error; // 不需要重试的错误直接即使抛出
+				if (!isRetryable) throw error; // 不需要重试的错误直接抛出
 
 				console.log(`   ⚠️ API 请求不稳定，${backoff}ms 后重试 (${i + 1}/${retries})...`);
 				await new Promise(resolve => setTimeout(resolve, backoff));
