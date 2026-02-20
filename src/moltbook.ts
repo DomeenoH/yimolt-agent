@@ -4,6 +4,122 @@
 
 import https from 'node:https';
 
+// =========== 验证挑战相关类型 ===========
+
+export interface VerificationChallenge {
+	verification_code: string;
+	challenge_text: string;
+	expires_at: string;
+	instructions: string;
+}
+
+export interface ContentWithVerification {
+	verification_status?: string;
+	verification?: VerificationChallenge;
+}
+
+/**
+ * 解析混淆的验证挑战文本，提取数学运算并计算结果
+ * 
+ * 挑战文本格式：lobster/物理主题，随机大小写 + 散乱符号（^[]/-）+ 碎片单词
+ * 例如："A] lO^bSt-Er S[wImS aT/ tW]eNn-Tyy mE^tE[rS aNd] SlO/wS bY^ fI[vE"
+ * → "a lobster swims at twenty meters and slows by five" → 20 - 5 = 15.00
+ */
+export function solveVerificationChallenge(challengeText: string): string {
+	// 1. 去除混淆符号，统一小写
+	const cleaned = challengeText
+		.replace(/[\[\]\^\-\/]/g, '')
+		.toLowerCase()
+		.replace(/\s+/g, ' ')
+		.trim();
+
+	// 2. 数字词映射
+	const numberWords: Record<string, number> = {
+		'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4,
+		'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9,
+		'ten': 10, 'eleven': 11, 'twelve': 12, 'thirteen': 13,
+		'fourteen': 14, 'fifteen': 15, 'sixteen': 16, 'seventeen': 17,
+		'eighteen': 18, 'nineteen': 19, 'twenty': 20, 'twentyy': 20,
+		'thirty': 30, 'thirtyy': 30, 'forty': 40, 'fortyy': 40,
+		'fifty': 50, 'fiftyy': 50, 'sixty': 60, 'sixtyy': 60,
+		'seventy': 70, 'seventyy': 70, 'eighty': 80, 'eightyy': 80,
+		'ninety': 90, 'ninetyy': 90, 'hundred': 100, 'hundredd': 100,
+		'thousand': 1000,
+		// 复合数词中的十位+个位（如 "twentyy five" → 25）
+		'twenntyy': 20, 'thentyy': 20,
+	};
+
+	// 3. 运算符词映射
+	const addOps = ['adds', 'plus', 'gains', 'increases by', 'increased by', 'and gains', 'and adds', 'speeds up by', 'accelerates by'];
+	const subOps = ['slows by', 'loses', 'minus', 'decreases by', 'decreased by', 'and slows by', 'and loses', 'drops by', 'reduces by', 'subtracts'];
+	const mulOps = ['times', 'multiplied by', 'multiplies by'];
+	const divOps = ['divided by', 'splits into', 'divides by'];
+
+	// 4. 从文本中提取所有数字（包括阿拉伯数字和英文数词）
+	const words = cleaned.split(' ');
+	const numbers: number[] = [];
+
+	// 先尝试匹配阿拉伯数字
+	const arabicMatches = cleaned.match(/\b\d+(\.\d+)?\b/g);
+	if (arabicMatches) {
+		for (const m of arabicMatches) {
+			numbers.push(parseFloat(m));
+		}
+	}
+
+	// 匹配英文数词
+	for (let i = 0; i < words.length; i++) {
+		const word = words[i];
+		if (numberWords[word] !== undefined) {
+			const value = numberWords[word];
+			// 检查是否是复合数词（如 twenty five = 25）
+			if (value >= 20 && value <= 90 && value % 10 === 0 && i + 1 < words.length) {
+				const nextWord = words[i + 1];
+				if (numberWords[nextWord] !== undefined && numberWords[nextWord] < 10) {
+					numbers.push(value + numberWords[nextWord]);
+					i++; // 跳过下一个词
+					continue;
+				}
+			}
+			numbers.push(value);
+		}
+	}
+
+	// 5. 识别运算符
+	let operator = '+';
+	if (subOps.some(op => cleaned.includes(op))) {
+		operator = '-';
+	} else if (mulOps.some(op => cleaned.includes(op))) {
+		operator = '*';
+	} else if (divOps.some(op => cleaned.includes(op))) {
+		operator = '/';
+	} else if (addOps.some(op => cleaned.includes(op))) {
+		operator = '+';
+	}
+
+	// 6. 计算
+	if (numbers.length < 2) {
+		console.error(`   ⚠️ 验证挑战解析失败：只找到 ${numbers.length} 个数字。原文: "${challengeText}"，清理后: "${cleaned}"`);
+		return '0.00';
+	}
+
+	const a = numbers[0];
+	const b = numbers[1];
+	let result: number;
+
+	switch (operator) {
+		case '+': result = a + b; break;
+		case '-': result = a - b; break;
+		case '*': result = a * b; break;
+		case '/': result = b !== 0 ? a / b : 0; break;
+		default: result = a + b;
+	}
+
+	const answer = result.toFixed(2);
+	console.log(`   🧮 验证挑战: ${a} ${operator} ${b} = ${answer}`);
+	return answer;
+}
+
 export interface Post {
 	id: string;
 	title: string;
@@ -192,20 +308,77 @@ export class MoltbookClient {
 		return this.request('GET', `/posts/${postId}`);
 	}
 
+	/**
+	 * 提交验证挑战答案
+	 */
+	async submitVerification(verificationCode: string, answer: string): Promise<{ success: boolean; message?: string }> {
+		return this.request('POST', '/verify', { verification_code: verificationCode, answer });
+	}
+
+	/**
+	 * 通用的内容验证处理——检查响应中是否包含验证挑战，如有则自动解题提交
+	 */
+	private async handleVerification<T extends { verification_required?: boolean }>(response: T & Record<string, unknown>): Promise<T> {
+		// 检查响应中任意嵌套对象是否包含 verification
+		const findVerification = (obj: Record<string, unknown>): ContentWithVerification | null => {
+			for (const value of Object.values(obj)) {
+				if (value && typeof value === 'object' && 'verification' in (value as Record<string, unknown>)) {
+					return value as ContentWithVerification;
+				}
+			}
+			return null;
+		};
+
+		const hasFlag = response.verification_required === true;
+		const content = findVerification(response);
+
+		if (!hasFlag || !content?.verification) {
+			// 无需验证（trusted agent 或 admin），直接返回
+			return response;
+		}
+
+		const challenge = content.verification;
+		console.log(`   🔐 需要 AI 验证挑战...`);
+
+		// 解题
+		const answer = solveVerificationChallenge(challenge.challenge_text);
+
+		// 提交答案
+		try {
+			const verifyResult = await this.submitVerification(challenge.verification_code, answer);
+			if (verifyResult.success) {
+				console.log(`   ✅ 验证通过！内容已发布`);
+			} else {
+				console.error(`   ❌ 验证失败: ${verifyResult.message || '答案错误'}`);
+			}
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : String(error);
+			console.error(`   ❌ 验证提交失败: ${msg}`);
+		}
+
+		return response;
+	}
+
 	async createPost(
 		submolt: string,
 		title: string,
 		content: string
 	): Promise<{ post: Post }> {
-		return this.request('POST', '/posts', { submolt_name: submolt, title, content });
+		const response = await this.request<{ post: Post & ContentWithVerification; verification_required?: boolean }>('POST', '/posts', { submolt_name: submolt, title, content });
+		await this.handleVerification(response);
+		return response;
 	}
 
 	async createComment(postId: string, content: string): Promise<{ comment: Comment }> {
-		return this.request('POST', `/posts/${postId}/comments`, { content });
+		const response = await this.request<{ comment: Comment & ContentWithVerification; verification_required?: boolean }>('POST', `/posts/${postId}/comments`, { content });
+		await this.handleVerification(response);
+		return response;
 	}
 
 	async replyToComment(postId: string, parentId: string, content: string): Promise<{ comment: Comment }> {
-		return this.request('POST', `/posts/${postId}/comments`, { content, parent_id: parentId });
+		const response = await this.request<{ comment: Comment & ContentWithVerification; verification_required?: boolean }>('POST', `/posts/${postId}/comments`, { content, parent_id: parentId });
+		await this.handleVerification(response);
+		return response;
 	}
 
 	async getMyPosts(limit?: number): Promise<{ posts: Post[] }> {
