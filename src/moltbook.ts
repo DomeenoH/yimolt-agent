@@ -27,8 +27,9 @@ export interface ContentWithVerification {
  */
 export function solveVerificationChallenge(challengeText: string): string {
 	// 1. 去除混淆符号，统一小写
+	// API 使用的混淆字符包括: [] ^ - / ~ \ {} <> 以及各种标点
 	const cleaned = challengeText
-		.replace(/[\[\]\^\-\/]/g, '')
+		.replace(/[\[\]\^\-\/~\\{}\<\>,;:!?()"'`]/g, '')
 		.toLowerCase()
 		.replace(/\s+/g, ' ')
 		.trim();
@@ -312,21 +313,25 @@ export class MoltbookClient {
 	/**
 	 * 通用的内容验证处理——检查响应中是否包含验证挑战，如有则自动解题提交
 	 */
-	private async handleVerification<T extends { verification_required?: boolean }>(response: T & Record<string, unknown>): Promise<T> {
-		// 检查响应中任意嵌套对象是否包含 verification
+	private async handleVerification<T>(response: T & Record<string, unknown>): Promise<T> {
+		// 检查响应中任意嵌套对象是否包含 verification 挑战
+		// API 实际行为：验证信息在 post.verification / comment.verification 中
+		// verificationStatus 为 "pending" 表示需要验证
 		const findVerification = (obj: Record<string, unknown>): ContentWithVerification | null => {
 			for (const value of Object.values(obj)) {
-				if (value && typeof value === 'object' && 'verification' in (value as Record<string, unknown>)) {
-					return value as ContentWithVerification;
+				if (value && typeof value === 'object') {
+					const record = value as Record<string, unknown>;
+					if ('verification' in record && record.verification) {
+						return value as ContentWithVerification;
+					}
 				}
 			}
 			return null;
 		};
 
-		const hasFlag = response.verification_required === true;
 		const content = findVerification(response);
 
-		if (!hasFlag || !content?.verification) {
+		if (!content?.verification) {
 			// 无需验证（trusted agent 或 admin），直接返回
 			return response;
 		}
@@ -358,19 +363,19 @@ export class MoltbookClient {
 		title: string,
 		content: string
 	): Promise<{ post: Post }> {
-		const response = await this.request<{ post: Post & ContentWithVerification; verification_required?: boolean }>('POST', '/posts', { submolt_name: submolt, title, content });
+		const response = await this.request<{ post: Post & ContentWithVerification }>('POST', '/posts', { submolt_name: submolt, title, content });
 		await this.handleVerification(response);
 		return response;
 	}
 
 	async createComment(postId: string, content: string): Promise<{ comment: Comment }> {
-		const response = await this.request<{ comment: Comment & ContentWithVerification; verification_required?: boolean }>('POST', `/posts/${postId}/comments`, { content });
+		const response = await this.request<{ comment: Comment & ContentWithVerification }>('POST', `/posts/${postId}/comments`, { content });
 		await this.handleVerification(response);
 		return response;
 	}
 
 	async replyToComment(postId: string, parentId: string, content: string): Promise<{ comment: Comment }> {
-		const response = await this.request<{ comment: Comment & ContentWithVerification; verification_required?: boolean }>('POST', `/posts/${postId}/comments`, { content, parent_id: parentId });
+		const response = await this.request<{ comment: Comment & ContentWithVerification }>('POST', `/posts/${postId}/comments`, { content, parent_id: parentId });
 		await this.handleVerification(response);
 		return response;
 	}
