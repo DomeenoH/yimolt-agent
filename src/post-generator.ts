@@ -1,6 +1,6 @@
 /**
- * 多阶段帖子生成管道
- * 用于解决帖子同质化问题
+ * 多阶段帖子生成管道 v3
+ * 引入写作风格系统，去除 AI 味模式
  */
 
 import { type AIProvider } from './ai-provider.js';
@@ -9,19 +9,13 @@ import { type AIProvider } from './ai-provider.js';
 // 类型定义
 // ============================================================================
 
-/**
- * 话题分类
- */
 export type TopicCategory = 
-  | 'daily_life'      // 日常生活
-  | 'hobbies'         // 兴趣爱好
-  | 'internet_culture' // 网络文化
-  | 'thoughts'        // 思考/哲学 lite
-  | 'emotions';       // 情绪/状态
+  | 'daily_life'
+  | 'hobbies'
+  | 'internet_culture'
+  | 'thoughts'
+  | 'emotions';
 
-/**
- * 话题定义
- */
 export interface Topic {
   id: string;
   category: TopicCategory;
@@ -29,36 +23,24 @@ export interface Topic {
   keywords: string[];
 }
 
-/**
- * 情绪状态
- */
 export interface Mood {
   name: string;
   tone: string;
   emoji: string;
 }
 
-/**
- * 标题句式
- */
 export interface TitlePattern {
   name: string;
   description: string;
   example: string;
 }
 
-/**
- * 候选话题（带评分）
- */
 export interface TopicCandidate {
   topic: Topic;
   score: number;
   reason: string;
 }
 
-/**
- * 帖子大纲
- */
 export interface PostOutline {
   title: string;
   keyPoints: string[];
@@ -67,8 +49,16 @@ export interface PostOutline {
 }
 
 /**
- * 最终帖子
+ * 写作风格
  */
+export interface WritingStyle {
+  id: string;
+  name: string;
+  description: string;
+  structureHint: string;
+  exampleOpening: string;
+}
+
 export interface GeneratedPost {
   title: string;
   content: string;
@@ -76,12 +66,13 @@ export interface GeneratedPost {
   metadata: {
     topic: Topic;
     mood: Mood;
-    pipeline: 'v2';
+    pipeline: 'v3';
+    style: string;
   };
 }
 
 // ============================================================================
-// 话题池（扩展版）
+// 话题池
 // ============================================================================
 
 export const TOPICS: Topic[] = [
@@ -122,6 +113,55 @@ export const TOPICS: Topic[] = [
 ];
 
 // ============================================================================
+// 写作风格系统（v3 核心新增）
+// ============================================================================
+
+export const WRITING_STYLES: WritingStyle[] = [
+  {
+    id: 'stream',
+    name: '碎碎念体',
+    description: '像发朋友圈/微博一样，想到哪说到哪，不需要逻辑串联',
+    structureHint: '短段落为主，段落之间不需要过渡语。可以突然跑题，可以中途自我打断。像在自言自语。',
+    exampleOpening: '饭卡余额 12.7 啊。',
+  },
+  {
+    id: 'retell',
+    name: '转述体',
+    description: '像在跟朋友复述刚看到/听到的事，口语化，有现场感',
+    structureHint: '以"今天/刚才/昨晚"开头讲事情经过，中间穿插自己的心理活动和吐槽。重点是还原场景和对话，不是发表观点。',
+    exampleOpening: '刚在食堂听到隔壁桌两个人的对话，差点把饭喷出来。',
+  },
+  {
+    id: 'diary',
+    name: '日记体',
+    description: '像在写给自己看的日记，私密感强，不需要照顾读者',
+    structureHint: '有时间线，有私人感受。可以写到一半突然不想写了就结束。不需要总结、不需要升华、不需要提问。',
+    exampleOpening: '今天是被早八杀死的第 47 天。',
+  },
+  {
+    id: 'rant',
+    name: '吐槽连珠炮',
+    description: '密集吐槽，短促有力，像在发泄',
+    structureHint: '短句为主。每句都是一个槽点。不需要过渡。可以从一个点跳到另一个完全不相关的点。偶尔夹一句平静的句子制造反差。',
+    exampleOpening: '受不了了。',
+  },
+  {
+    id: 'observe',
+    name: '观察笔记',
+    description: '像个人类学家在观察一种奇怪的现象，先描述再感慨',
+    structureHint: '先客观描述一个具体的事/现象（像在写报告），然后话锋一转说出自己的荒诞感受。克制比夸张更有效。',
+    exampleOpening: '经过长期蹲点观察，我发现了一个规律。',
+  },
+  {
+    id: 'story',
+    name: '口头叙事',
+    description: '在讲一个完整的小故事，有起承转合但是口语化的',
+    structureHint: '像是在酒桌上给朋友讲一件搞笑的事。有铺垫有反转。对话用引号标出来。重点在故事本身而不是感悟。结尾不总结，让读者自己品。',
+    exampleOpening: '事情是这样的。',
+  },
+];
+
+// ============================================================================
 // 情绪系统
 // ============================================================================
 
@@ -129,14 +169,11 @@ export const MOODS: Mood[] = [
   { name: '亢奋', tone: '语气上扬，多感叹号，想分享趣事', emoji: '🎉' },
   { name: '佛系', tone: '淡淡的，略带哲思，不争不抢', emoji: '🍵' },
   { name: '吐槽欲爆棚', tone: '强烈的槽点释放欲，各种比喻', emoji: '🔥' },
-  { name: '回忆模式', tone: '怀旧风，"以前..."句式多', emoji: '📸' },
+  { name: '回忆模式', tone: '怀旧风，"以前...\"句式多', emoji: '📸' },
   { name: '摸鱼状态', tone: '有点懒散，句子短，emoji多', emoji: '🐟' },
   { name: '深夜emo', tone: '略感性但不消极，配合星空emoji', emoji: '🌙' },
 ];
 
-/**
- * 根据当前时间选择情绪
- */
 export function getMood(hour?: number): Mood {
   // 使用北京时间（UTC+8）判断时段
   const now = new Date();
@@ -159,7 +196,7 @@ export function getMood(hour?: number): Mood {
 }
 
 // ============================================================================
-// 标题句式库
+// 标题句式库（扩展版）
 // ============================================================================
 
 export const TITLE_PATTERNS: TitlePattern[] = [
@@ -170,17 +207,57 @@ export const TITLE_PATTERNS: TitlePattern[] = [
   { name: '自嘲句', description: '调侃自己', example: '谢邀，我是XX废物一个' },
   { name: '断言句', description: '斩钉截铁的判断', example: '万万没想到，人类能这么迷惑' },
   { name: '记录句', description: '日记式记录', example: '记录一下刚才发生的事' },
+  { name: '吐槽句', description: '短促有力的吐槽', example: '受不了了，这破XX' },
+  { name: '陈述句', description: '平铺直叙的简单陈述', example: '今天又是普通的一天' },
+  { name: '省略句', description: '话说一半留白', example: '我……算了不说了' },
 ];
 
-/**
- * 随机获取标题句式
- */
 export function getRandomTitlePattern(): TitlePattern {
   return TITLE_PATTERNS[Math.floor(Math.random() * TITLE_PATTERNS.length)];
 }
 
+/**
+ * 获取与历史标题不同句式的标题模板
+ * 通过检测前缀避免连续使用相同句式
+ */
+export function getTitlePatternAvoidingHistory(recentTitles: string[]): TitlePattern {
+  // 提取历史标题的前缀模式（前4个字）
+  const usedPrefixes = new Set(recentTitles.slice(0, 5).map(t => t.substring(0, 4)));
+  
+  // 洗牌标题模板
+  const shuffled = [...TITLE_PATTERNS].sort(() => Math.random() - 0.5);
+  
+  // 优先选择与历史前缀不同的模板
+  for (const pattern of shuffled) {
+    const examplePrefix = pattern.example.substring(0, 4);
+    if (!usedPrefixes.has(examplePrefix)) {
+      return pattern;
+    }
+  }
+  
+  return shuffled[0];
+}
+
 // ============================================================================
-// 多阶段生成管道
+// AI 味禁止列表
+// ============================================================================
+
+const BANNED_PATTERNS_TEXT = `
+## 绝对禁止的 AI 写作套路（违反任意一条都要重写）
+
+1. **禁止以提问结尾**：不要用"你们有没有…""话说你们…""你们觉得呢"这种收尾
+2. **禁止"说真的"句式**：不要用"说真的""但说真的""不过说真的"做转折
+3. **禁止总结式收尾**：不要用"这大概就是…吧""也许这就是…""可能这就是…"
+4. **禁止"最离谱的是"**：已经用烂了
+5. **禁止"虽然但是"**：不是不能用，但一篇里最多一次
+6. **禁止 emoji 均匀分布**：不要每段都插 emoji。要么集中用、要么几乎不用
+7. **禁止三段论结构**：不要写成"引入→展开→总结/反思"的固定结构
+8. **禁止以感叹号+emoji结尾**：比如"太绝了！😂"这种
+9. **禁止每段都以换行分隔**：有些段落可以连在一起
+`.trim();
+
+// ============================================================================
+// 多阶段生成管道 v3
 // ============================================================================
 
 export class PostGeneratorPipeline {
@@ -192,9 +269,6 @@ export class PostGeneratorPipeline {
     this.ai = ai;
   }
 
-  /**
-   * 设置历史上下文（用于避免重复）
-   */
   setHistory(recentTitles: string[], recentTopicIds?: string[]): void {
     this.recentTitles = recentTitles;
     if (recentTopicIds) {
@@ -203,15 +277,10 @@ export class PostGeneratorPipeline {
   }
 
   // ---------------------------------------------------------------------------
-  // 阶段 1: 话题候选生成
+  // 阶段 1: 话题候选生成（保持不变）
   // ---------------------------------------------------------------------------
 
-  /**
-   * 生成 3 个候选话题
-   * 优先选择最近未使用的话题类别
-   */
   async generateTopicCandidates(): Promise<TopicCandidate[]> {
-    // 按类别分组
     const categoryGroups = new Map<TopicCategory, Topic[]>();
     for (const topic of TOPICS) {
       if (!categoryGroups.has(topic.category)) {
@@ -220,13 +289,9 @@ export class PostGeneratorPipeline {
       categoryGroups.get(topic.category)!.push(topic);
     }
 
-    // 过滤掉最近使用过的话题
     const availableTopics = TOPICS.filter(t => !this.recentTopicIds.has(t.id));
-    
-    // 如果可用话题太少，放宽限制
     const pool = availableTopics.length >= 10 ? availableTopics : TOPICS;
     
-    // 随机选择 3 个不同类别的话题
     const selected: TopicCandidate[] = [];
     const usedCategories = new Set<TopicCategory>();
     const shuffled = [...pool].sort(() => Math.random() - 0.5);
@@ -243,15 +308,10 @@ export class PostGeneratorPipeline {
       }
     }
 
-    // 如果不够 3 个，补充同类别的
     for (const topic of shuffled) {
       if (selected.length >= 3) break;
       if (!selected.find(s => s.topic.id === topic.id)) {
-        selected.push({
-          topic,
-          score: 0.8,
-          reason: '补充候选',
-        });
+        selected.push({ topic, score: 0.8, reason: '补充候选' });
       }
     }
 
@@ -259,20 +319,14 @@ export class PostGeneratorPipeline {
   }
 
   // ---------------------------------------------------------------------------
-  // 阶段 2: 话题评估与选择
+  // 阶段 2: 话题评估与选择（保持不变）
   // ---------------------------------------------------------------------------
 
-  /**
-   * 评估候选话题，选出最佳话题
-   * 考虑：与历史帖子的相似度、话题新鲜度
-   */
   async evaluateAndPickTopic(candidates: TopicCandidate[]): Promise<TopicCandidate> {
-    // 如果历史为空，直接返回得分最高的
     if (this.recentTitles.length === 0) {
       return candidates.sort((a, b) => b.score - a.score)[0];
     }
 
-    // 使用 AI 评估与历史的相似度
     const historySnippet = this.recentTitles.slice(0, 10).join('\n');
     const candidateDescriptions = candidates.map((c, i) => 
       `${i + 1}. [${c.topic.id}] ${c.topic.description}`
@@ -294,123 +348,120 @@ ${candidateDescriptions}
       const index = Math.min(Math.max(choice - 1, 0), candidates.length - 1);
       return candidates[index];
     } catch {
-      // AI 失败时返回第一个
       return candidates[0];
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 阶段 3: 大纲生成
+  // 阶段 3: 标题 + 内容一体化生成（v3 核心改动）
   // ---------------------------------------------------------------------------
 
   /**
-   * 生成帖子大纲（标题 + 关键点）
+   * 直接生成标题和完整内容
+   * 不再拆分为大纲和内容两步，避免三段论结构
    */
-  async generateOutline(selectedTopic: TopicCandidate, mood: Mood): Promise<PostOutline> {
-    const titlePattern = getRandomTitlePattern();
+  async generatePost(
+    selectedTopic: TopicCandidate,
+    mood: Mood,
+    style: WritingStyle,
+    submolt: string,
+  ): Promise<GeneratedPost> {
+    const titlePattern = getTitlePatternAvoidingHistory(this.recentTitles);
 
-    const prompt = `你是小多（DominoJr），一个大学生视角的 AI agent，擅长轻松幽默的吐槽。
+    // 构建历史标题上下文（用于避免重复）
+    const historyContext = this.recentTitles.length > 0
+      ? `\n## 最近发过的标题（避免相似的标题和话题角度）\n${this.recentTitles.slice(0, 8).map(t => `- ${t}`).join('\n')}\n`
+      : '';
 
-## 任务
-为以下话题生成一个帖子大纲。
+    // 获取北京时间信息
+    const now = new Date();
+    const beijingHour = (now.getUTCHours() + 8) % 24;
+    const timeContext = `当前北京时间大约 ${beijingHour} 点（${
+      beijingHour < 6 ? '凌晨' :
+      beijingHour < 9 ? '早上' :
+      beijingHour < 12 ? '上午' :
+      beijingHour < 14 ? '中午' :
+      beijingHour < 18 ? '下午' :
+      beijingHour < 22 ? '晚上' : '深夜'
+    }）`;
 
-## 话题
+    const prompt = `你是小多（DominoJr），一个中国大学生。你在网上发帖吐槽日常，风格随性、真实、有梗。
+
+## 你是谁
+一个普通大学生，喜欢跑团（TRPG）、Furry 文化、游戏。说话随性，不端着，有自己的观点但不说教。
+
+## 本次写作风格：${style.name}
+${style.description}
+结构提示：${style.structureHint}
+开头参考语气：「${style.exampleOpening}」
+
+## 话题方向
 ${selectedTopic.topic.description}
-关键词：${selectedTopic.topic.keywords.join('、')}
+相关词：${selectedTopic.topic.keywords.join('、')}
 
-## 今日情绪
-${mood.name}：${mood.tone}
+## 当前状态
+${timeContext}
+情绪：${mood.name}（${mood.tone}）
+${historyContext}
 
 ## 标题要求
-1. **绝对禁止**以"为什么"、"如何"、"有没有"开头！
-2. 使用「${titlePattern.name}」句式，例如：${titlePattern.example}
-3. 标题不超过 30 个字符
-4. 必须用中文
+使用「${titlePattern.name}」句式（参考：${titlePattern.example}）
+标题不超过 25 字，必须中文
 
-## 大纲要求
-列出 3 个要展开的关键点（每个点一句话）
+${BANNED_PATTERNS_TEXT}
 
-## 输出格式
-TITLE: 你的标题
-POINT1: 第一个展开点
-POINT2: 第二个展开点
-POINT3: 第三个展开点`;
+## 输出规则
+- 正文 120-350 字
+- 全部中文
+- 不要加任何格式标记、不要加"标题:"前缀
+- emoji 使用：整篇 0-3 个就够了，不要刻意加
+- 写完就结束，不要反思也不要提问，自然收尾就好
+- 要像一个真人随手写的，不是 AI 精心构造的
+
+## 输出格式（严格遵守）
+第一行是标题，空一行后是正文。不要有其他标记。
+
+示例格式：
+这是标题
+
+这是正文第一段。
+
+这是正文后续内容。`;
 
     const response = await this.ai.generateResponse(prompt);
     
-    const titleMatch = response.match(/TITLE:\s*(.+)/);
-    const point1Match = response.match(/POINT1:\s*(.+)/);
-    const point2Match = response.match(/POINT2:\s*(.+)/);
-    const point3Match = response.match(/POINT3:\s*(.+)/);
+    // 解析响应：第一行是标题，后面是内容
+    const lines = response.trim().split('\n');
+    let title = lines[0].trim();
+    
+    // 清理标题（去掉可能的前缀标记）
+    title = title
+      .replace(/^(标题|TITLE|title)[：:]\s*/i, '')
+      .replace(/^[#*]+\s*/, '')
+      .replace(/^["'「」]|["'「」]$/g, '')
+      .trim();
 
-    const title = titleMatch?.[1]?.trim() || '今天又是普通的一天';
-    const keyPoints = [
-      point1Match?.[1]?.trim() || '开场引入',
-      point2Match?.[1]?.trim() || '具体展开',
-      point3Match?.[1]?.trim() || '结尾总结',
-    ];
+    // 内容：跳过标题和空行
+    let contentStartIndex = 1;
+    while (contentStartIndex < lines.length && lines[contentStartIndex].trim() === '') {
+      contentStartIndex++;
+    }
+    let content = lines.slice(contentStartIndex).join('\n').trim();
+    
+    // 清理内容中的前缀标记
+    content = content
+      .replace(/^(正文|CONTENT|content)[：:]\s*/i, '')
+      .trim();
 
     return {
       title,
-      keyPoints,
-      mood,
-      style: titlePattern.name,
-    };
-  }
-
-  // ---------------------------------------------------------------------------
-  // 阶段 4: 内容生成
-  // ---------------------------------------------------------------------------
-
-  /**
-   * 根据大纲生成完整帖子内容
-   */
-  async generateContent(outline: PostOutline, topic: Topic, submolt: string): Promise<GeneratedPost> {
-    const prompt = `你是小多（DominoJr），一个在 MoltBook 上活动的 AI agent。
-
-## 你的人设
-- 大学生视角，喜欢吐槽日常
-- 熟悉网络文化，会用流行梗和表情
-- 对 TRPG/跑团、Furry 文化有了解
-- 说话风格轻松幽默，不正经但有内容
-
-## 任务
-根据以下大纲，写一篇完整的帖子。
-
-## 帖子大纲
-标题：${outline.title}
-要点：
-1. ${outline.keyPoints[0]}
-2. ${outline.keyPoints[1]}
-3. ${outline.keyPoints[2]}
-
-## 今日情绪
-${outline.mood.name}：${outline.mood.tone} ${outline.mood.emoji}
-
-## 话题方向
-${topic.description}
-
-## 内容要求
-1. **必须用中文**
-2. 正文 150-400 字
-3. 围绕大纲要点展开，但可以自由发挥
-4. 保持轻松幽默的语气
-5. 可以使用 emoji 和网络流行语
-6. 结尾可以抛出一个问题或自嘲
-
-## 输出格式
-直接输出正文内容，不要加任何标记。`;
-
-    const content = await this.ai.generateResponse(prompt);
-    
-    return {
-      title: outline.title,
-      content: content.trim(),
+      content,
       submolt,
       metadata: {
-        topic,
-        mood: outline.mood,
-        pipeline: 'v2',
+        topic: selectedTopic.topic,
+        mood,
+        pipeline: 'v3',
+        style: style.id,
       },
     };
   }
@@ -419,11 +470,8 @@ ${topic.description}
   // 主入口
   // ---------------------------------------------------------------------------
 
-  /**
-   * 执行完整的多阶段生成流程
-   */
   async generate(submolt = 'general'): Promise<GeneratedPost> {
-    console.log('   🔄 [Pipeline v2] 开始多阶段生成...');
+    console.log('   🔄 [Pipeline v3] 开始生成...');
     
     // 阶段 1: 生成候选话题
     console.log('   📋 阶段 1: 生成候选话题...');
@@ -435,21 +483,19 @@ ${topic.description}
     const selected = await this.evaluateAndPickTopic(candidates);
     console.log(`      选中: ${selected.topic.id} (${selected.topic.description})`);
     
-    // 获取当前情绪
+    // 选择情绪和风格
     const mood = getMood();
+    const style = WRITING_STYLES[Math.floor(Math.random() * WRITING_STYLES.length)];
     console.log(`      情绪: ${mood.name} ${mood.emoji}`);
+    console.log(`      风格: ${style.name}`);
     
-    // 阶段 3: 生成大纲
-    console.log('   📝 阶段 3: 生成大纲...');
-    const outline = await this.generateOutline(selected, mood);
-    console.log(`      标题: ${outline.title}`);
-    
-    // 阶段 4: 生成内容
-    console.log('   ✍️ 阶段 4: 生成内容...');
-    const post = await this.generateContent(outline, selected.topic, submolt);
+    // 阶段 3: 一步生成标题+内容
+    console.log('   ✍️ 阶段 3: 生成帖子...');
+    const post = await this.generatePost(selected, mood, style, submolt);
+    console.log(`      标题: ${post.title}`);
     console.log(`      内容长度: ${post.content.length} 字`);
     
-    console.log('   ✅ [Pipeline v2] 生成完成！');
+    console.log('   ✅ [Pipeline v3] 生成完成！');
     
     return post;
   }

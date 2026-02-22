@@ -175,86 +175,70 @@ describe('PostGeneratorPipeline', () => {
       });
     });
 
-    describe('generateOutline()', () => {
-      it('应返回完整的大纲', async () => {
-        mockAI.generateResponse.mockResolvedValue(`TITLE: 今天食堂发生了神奇的事
-POINT1: 开场描述场景
-POINT2: 展开关键事件
-POINT3: 结尾感叹`);
-        
-        const candidate: TopicCandidate = {
-          topic: TOPICS[0],
-          score: 1.0,
-          reason: 'test',
-        };
-        
-        const outline = await pipeline.generateOutline(candidate, MOODS[0]);
-        
-        expect(outline.title).toBe('今天食堂发生了神奇的事');
-        expect(outline.keyPoints.length).toBe(3);
-        expect(outline.mood.name).toBe(MOODS[0].name);
-      });
-
-      it('AI 返回格式错误时应有默认值', async () => {
-        mockAI.generateResponse.mockResolvedValue('格式错误的响应');
-        
-        const candidate: TopicCandidate = {
-          topic: TOPICS[0],
-          score: 1.0,
-          reason: 'test',
-        };
-        
-        const outline = await pipeline.generateOutline(candidate, MOODS[0]);
-        
-        expect(outline.title).toBeDefined();
-        expect(outline.keyPoints.length).toBe(3);
-      });
-    });
-
-    describe('generateContent()', () => {
+    describe('generatePost()', () => {
       it('应返回完整的帖子', async () => {
-        const testContent = '这是一段测试内容，大概 150-400 字左右...';
-        mockAI.generateResponse.mockResolvedValue(testContent);
+        mockAI.generateResponse.mockResolvedValue(`测试标题
+
+这是一段测试内容，大概 150-400 字左右...`);
         
-        const outline = {
-          title: '测试标题',
-          keyPoints: ['要点1', '要点2', '要点3'],
-          mood: MOODS[0],
-          style: '叙事句',
+        const candidate: TopicCandidate = {
+          topic: TOPICS[0],
+          score: 1.0,
+          reason: 'test',
         };
+
+        // 导入 WritingStyle
+        const { WRITING_STYLES } = await import('./post-generator.js');
         
-        const post = await pipeline.generateContent(outline, TOPICS[0], 'general');
+        const post = await pipeline.generatePost(candidate, MOODS[0], WRITING_STYLES[0], 'general');
         
         expect(post.title).toBe('测试标题');
-        expect(post.content).toBe(testContent);
+        expect(post.content).toBeDefined();
         expect(post.submolt).toBe('general');
-        expect(post.metadata.pipeline).toBe('v2');
+        expect(post.metadata.pipeline).toBe('v3');
+        expect(post.metadata.style).toBe(WRITING_STYLES[0].id);
+      });
+
+      it('应正确解析标题和内容', async () => {
+        mockAI.generateResponse.mockResolvedValue(`今天食堂又出新菜了
+
+说是新菜其实就是换了个摆盘。`);
+        
+        const candidate: TopicCandidate = {
+          topic: TOPICS[0],
+          score: 1.0,
+          reason: 'test',
+        };
+
+        const { WRITING_STYLES } = await import('./post-generator.js');
+        const post = await pipeline.generatePost(candidate, MOODS[0], WRITING_STYLES[0], 'general');
+        
+        expect(post.title).toBe('今天食堂又出新菜了');
+        expect(post.content).toBe('说是新菜其实就是换了个摆盘。');
       });
     });
 
     describe('generate() 完整流程', () => {
-      it('应执行完整的 4 阶段流程', async () => {
-        // Mock 各阶段的 AI 响应
-        // 注意：阶段2在没有历史时不调用AI，所以只有阶段3和4需要mock
+      it('应执行完整的 3 阶段流程', async () => {
+        // v3: 只需要 mock 一次 AI 调用（阶段3: generatePost）
+        // 阶段2 在无历史时不调用 AI
         mockAI.generateResponse
-          .mockResolvedValueOnce(`TITLE: 测试标题
-POINT1: 要点1
-POINT2: 要点2
-POINT3: 要点3`) // generateOutline
-          .mockResolvedValueOnce('这是最终生成的内容'); // generateContent
+          .mockResolvedValueOnce(`测试标题
+
+这是最终生成的内容`);
         
         const post = await pipeline.generate('general');
         
-        // 验证核心字段存在且格式正确
         expect(post.title).toBe('测试标题');
         expect(post.content).toBe('这是最终生成的内容');
         expect(post.submolt).toBe('general');
-        expect(post.metadata.pipeline).toBe('v2');
+        expect(post.metadata.pipeline).toBe('v3');
         expect(post.metadata.topic).toBeDefined();
         expect(post.metadata.mood).toBeDefined();
+        expect(post.metadata.style).toBeDefined();
         
-        // 阶段3和4各调用一次AI（阶段2无历史时不调用）
-        expect(mockAI.generateResponse).toHaveBeenCalledTimes(2);
+        // v3: 阶段3 只调用一次 AI（阶段2无历史时不调用）
+        expect(mockAI.generateResponse).toHaveBeenCalledTimes(1);
       });
     });
   });

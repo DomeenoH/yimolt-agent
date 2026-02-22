@@ -421,9 +421,7 @@ export class YiMoltAgent {
 		lines.push('|------|------|------|');
 		lines.push('| VIEW_COMMENTS | 查看帖子评论（仅用于有🆕标记的帖子） | postId |');
 		lines.push('| REPLY_COMMENT | 回复评论 | postId, commentId |');
-		if (context.canPost) {
-			lines.push('| CREATE_POST | 发新帖子 | submolt (可选) |');
-		}
+		// CREATE_POST 不在社交循环中提供——发帖统一由 heartbeat 步骤 2 控制
 		lines.push('| DELETE_POST | 删除自己的帖子 | postId |');
 		lines.push('| FOLLOW_USER | 关注用户 | username |');
 		lines.push('| UNFOLLOW_USER | 取关用户 | username |');
@@ -450,7 +448,7 @@ export class YiMoltAgent {
 		lines.push('');
 		lines.push('1. **有🆕标记的帖子** → VIEW_COMMENTS 查看，然后 REPLY_COMMENT 回复');
 		lines.push('2. **没有🆕标记** = 没有新评论，**不要** VIEW_COMMENTS（浪费时间）');
-		lines.push('3. **所有新评论都处理完了** → 直接 DONE 结束');
+		lines.push('3. **所有新评论都处理完了** → 直接 DONE 结束（发帖由系统自动处理，不需要你操心）');
 		lines.push('4. **遇到 spam 评论**（广告、TipJarBot 等）→ MARK_SPAM 标记，不回复');
 		lines.push('');
 		lines.push('⚠️ 重要：✓ 标记的帖子表示已经检查过或没有新评论，不需要再 VIEW_COMMENTS！');
@@ -475,8 +473,6 @@ export class YiMoltAgent {
 	 * _Requirements: 1.5, 1.6_
 	 */
 	async runSocialInteractionLoop(): Promise<void> {
-		console.log('🔄 社交互动循环');
-
 		console.log('🔄 社交互动循环');
 
 		// 1. 构建初始上下文
@@ -521,11 +517,14 @@ export class YiMoltAgent {
 				const last = lastTwo[1];
 				const secondLast = lastTwo[0];
 				
-				// 如果连续两次是相同的 VIEW_COMMENTS 动作，强制跳过
+				// 如果连续两次是相同的 VIEW_COMMENTS 动作，强制标记为已查看
 				if (last.action.action === 'VIEW_COMMENTS' && 
 					secondLast.action.action === 'VIEW_COMMENTS' &&
 					last.action.params?.postId === secondLast.action.params?.postId) {
-					console.log(`   ⚠️ 检测到重复动作`);
+					console.log(`   ⚠️ 检测到重复动作，强制标记已查看`);
+					if (last.action.params?.postId) {
+						viewedPostIds.add(last.action.params.postId);
+					}
 				}
 			}
 
@@ -1163,13 +1162,7 @@ export class YiMoltAgent {
 	}
 
 	async createOriginalPost(submolt = 'general'): Promise<Post | null> {
-		if (!this.canPost()) {
-			const waitTime = Math.ceil(
-				(this.POST_COOLDOWN_MS - (Date.now() - this.lastPostTime)) / 60000
-			);
-			console.log(`⏳ 发帖冷却中，还需等待 ${waitTime} 分钟`);
-			return null;
-		}
+		// 冷却检查统一由 heartbeat 的 checkApiCooldown() 负责，这里不再重复检查
 
 		console.log(` 正在为 m/${submolt} 生成新帖子...`);
 
@@ -1298,9 +1291,11 @@ ${titleList}
 				console.log(`\n📝 发帖: 冷却中 (${cooldownStatus.waitMinutes || '?'}分钟后)`);
 			}
 
-			// 3. 最终状态
+			// 3. 最终状态（使用 getMyPosts 获取真实帖子数，API profile 的 posts_count 可能不准确）
 			const { agent } = await this.client.getAgentProfile();
-			console.log(`\n📊 Karma ${agent.karma} | 帖子 ${agent.posts_count} | 粉丝 ${agent.follower_count || 0}`);
+			const { posts: finalPosts } = await this.client.getMyPosts();
+			const actualPostsCount = finalPosts.length || agent.posts_count;
+			console.log(`\n📊 Karma ${agent.karma} | 帖子 ${actualPostsCount} | 粉丝 ${agent.follower_count || 0}`);
 			console.log('='.repeat(50));
 
 			// 结束记录并保存

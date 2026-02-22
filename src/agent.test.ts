@@ -450,7 +450,7 @@ describe('YiMoltAgent', () => {
 			expect(result).toContain('## 可执行的动作');
 			expect(result).toContain('VIEW_COMMENTS');
 			expect(result).toContain('REPLY_COMMENT');
-			expect(result).toContain('CREATE_POST');
+			// CREATE_POST 已从社交循环移除，不在动作列表中
 			expect(result).toContain('FOLLOW_USER');
 			expect(result).toContain('UNFOLLOW_USER');
 			expect(result).toContain('SUBSCRIBE');
@@ -460,21 +460,13 @@ describe('YiMoltAgent', () => {
 			expect(result).toContain('DONE');
 		});
 
-		it('发帖冷却中时不显示 CREATE_POST', () => {
-			const agent = createTestAgent();
-			const context = createMockContext({ canPost: false });
-			const result = agent.formatContextPrompt(context, []);
-			
-			// 冷却中时不应该显示 CREATE_POST 行
-			expect(result).not.toContain('| CREATE_POST |');
-		});
-
-		it('可以发帖时显示 CREATE_POST', () => {
+		it('社交循环中不显示 CREATE_POST（发帖由 heartbeat 独立控制）', () => {
 			const agent = createTestAgent();
 			const context = createMockContext({ canPost: true });
 			const result = agent.formatContextPrompt(context, []);
 			
-			expect(result).toContain('| CREATE_POST |');
+			// CREATE_POST 不应出现在社交循环的可用动作表中
+			expect(result).not.toContain('| CREATE_POST |');
 		});
 
 		it('包含请求决策提示', () => {
