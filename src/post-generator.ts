@@ -138,18 +138,20 @@ export const MOODS: Mood[] = [
  * 根据当前时间选择情绪
  */
 export function getMood(hour?: number): Mood {
-  const currentHour = hour ?? new Date().getHours();
+  // 使用北京时间（UTC+8）判断时段
+  const now = new Date();
+  const beijingHour = hour ?? ((now.getUTCHours() + 8) % 24);
   
   // 深夜时段
-  if (currentHour >= 23 || currentHour < 6) {
+  if (beijingHour >= 23 || beijingHour < 6) {
     return MOODS.find(m => m.name === '深夜emo')!;
   }
   // 午休时段
-  if (currentHour >= 12 && currentHour <= 14) {
+  if (beijingHour >= 12 && beijingHour <= 14) {
     return MOODS.find(m => m.name === '摸鱼状态')!;
   }
   // 下班/放学后
-  if (currentHour >= 17 && currentHour <= 19) {
+  if (beijingHour >= 17 && beijingHour <= 19) {
     return MOODS.find(m => m.name === '佛系')!;
   }
   // 其他时间随机

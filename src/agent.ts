@@ -241,14 +241,15 @@ export class YiMoltAgent {
 	 * @returns AgentContext 对象
 	 */
 	async buildAgentContext(): Promise<AgentContext> {
-		// 1. 获取 Agent profile（karma、帖子数）
+		// 1. 获取 Agent profile（karma）
 		const { agent } = await this.client.getAgentProfile();
 		const agentName = agent.name;
 		const karma = agent.karma;
-		const postsCount = agent.posts_count;
 
 		// 2. 获取最近帖子列表
 		const { posts } = await this.client.getMyPosts();
+		// 优先使用实际帖子数量，API 的 posts_count 可能不准确
+		const postsCount = posts.length || agent.posts_count;
 
 		// 3. 检测每个帖子的新评论和 vote 变化
 		const recentPosts: PostWithStatus[] = [];
