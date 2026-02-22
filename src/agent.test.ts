@@ -895,29 +895,15 @@ describe('YiMoltAgent', () => {
 		});
 
 		describe('CREATE_POST', () => {
-			it('成功发帖时返回成功信息', async () => {
-				const agent = createAgentWithMocks({
-					createOriginalPost: async () => ({
-						id: 'new-post',
-						title: '新帖子标题',
-						submolt: { name: 'general' },
-					}),
-				});
-				const result = await agent.executeAction({ action: 'CREATE_POST', params: { submolt: 'general' } });
-				expect(result).toContain('✅');
-				expect(result).toContain('成功发布');
-				expect(result).toContain('新帖子标题');
-				expect(result).toContain('m/general');
+			it('拦截在互动循环中触发的发帖请求', async () => {
+			const agent = createAgentWithMocks();
+			const result = await agent.executeAction({
+				action: 'CREATE_POST',
+				params: { submolt: 'general' }
 			});
-
-			it('发帖失败（冷却中）时返回失败信息', async () => {
-				const agent = createAgentWithMocks({
-					createOriginalPost: async () => null,
-				});
-				const result = await agent.executeAction({ action: 'CREATE_POST' });
-				expect(result).toContain('❌');
-				expect(result).toContain('发帖失败');
-			});
+			expect(result).toContain('✅ 发帖请求已记录');
+			expect(result).toContain('不再在此处执行');
+		});
 		});
 
 		describe('DONE', () => {

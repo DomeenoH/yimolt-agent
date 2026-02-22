@@ -429,8 +429,8 @@ export class YiMoltAgent {
 		lines.push('| UNSUBSCRIBE | 取消订阅 | submolt |');
 		lines.push('| SEARCH | 语义搜索 | query |');
 		lines.push('| VIEW_PROFILE | 查看用户资料 | username |');
-		lines.push('| MARK_SPAM | 标记用户为垃圾信息 | username |');
-		lines.push('| DONE | 结束本次活动 | 无 |');
+		lines.push('| MARK_SPAM | 将该评论用户标记为spam并屏蔽（仅当明显是广告或骚扰时使用） | username |');
+		lines.push('| DONE | 结束当前互动流程（没有需要处理的新评论时使用） | 无 |');
 		lines.push('');
 
 		// 6. 响应格式说明
@@ -448,7 +448,7 @@ export class YiMoltAgent {
 		lines.push('');
 		lines.push('1. **有🆕标记的帖子** → VIEW_COMMENTS 查看，然后 REPLY_COMMENT 回复');
 		lines.push('2. **没有🆕标记** = 没有新评论，**不要** VIEW_COMMENTS（浪费时间）');
-		lines.push('3. **所有新评论都处理完了** → 直接 DONE 结束（发帖由系统自动处理，不需要你操心）');
+		lines.push('3. **所有新评论都处理完了** → 直接 DONE 结束（发帖由系统自动处理）');
 		lines.push('4. **遇到 spam 评论**（广告、TipJarBot 等）→ MARK_SPAM 标记，不回复');
 		lines.push('');
 		lines.push('⚠️ 重要：✓ 标记的帖子表示已经检查过或没有新评论，不需要再 VIEW_COMMENTS！');
@@ -625,7 +625,8 @@ export class YiMoltAgent {
 				return this.executeReplyComment(params.postId, params.commentId, params.content);
 			
 			case 'CREATE_POST':
-				return this.executeCreatePost(params.submolt);
+				// 已将发帖剥离出互动循环，但为防止旧 AI 缓存输出，这里做个拦截
+				return '✅ 发帖请求已记录，将由系统自动调度发布（不再在此处执行）';
 			
 			case 'DELETE_POST':
 				return this.executeDeletePost(params.postId);
@@ -859,50 +860,6 @@ export class YiMoltAgent {
 			});
 			
 			return `❌ 回复评论失败: ${errorMessage}`;
-		}
-	}
-
-	/**
-	 * 执行 CREATE_POST 动作
-	 * 创建新帖子（使用现有的 createOriginalPost 方法）
-	 */
-	private async executeCreatePost(submolt?: string): Promise<string> {
-		try {
-			const post = await this.createOriginalPost(submolt || 'general');
-			
-			if (post) {
-				// 记录活动日志
-				this.activityLog.logActivity({
-					action: 'CREATE_POST',
-					params: { submolt: post.submolt.name },
-					result: 'success',
-					details: {
-						postId: post.id,
-						postTitle: post.title,
-						postContent: post.content,
-					},
-				});
-				
-				return `✅ 成功发布新帖子\n标题: "${post.title}"\n社区: m/${post.submolt.name}`;
-			} else {
-				// createOriginalPost 返回 null 通常是因为冷却中
-				this.activityLog.logActivity({
-					action: 'CREATE_POST',
-					params: { submolt: submolt || 'general' },
-					result: 'skipped: cooldown',
-				});
-				return '❌ 发帖失败，可能处于冷却期间';
-			}
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			
-			this.activityLog.logActivity({
-				action: 'CREATE_POST',
-				params: { submolt: submolt || 'general' },
-				result: `failed: ${errorMessage}`,
-			});
-			
-			return `❌ 发帖失败: ${errorMessage}`;
 		}
 	}
 
@@ -1146,11 +1103,8 @@ export class YiMoltAgent {
 			const lastPostTime = new Date(posts[0].created_at).getTime();
 			const elapsed = Date.now() - lastPostTime;
 
-			// 使用随机冷却时间：基础 2 小时 + 随机 0~2 小时，总计 2~4 小时冷却
-			// 以毫秒为单位：2小时 = 7200000ms, 4小时 = 14400000ms
-			// 为了确保每次检查不过度跳动，我们可以根据最后一贴的 ID 进行伪随机，
-			// 或者简单点，我们这里统一取 3 小时的固定冷却
-			const cooldownMs = 3 * 60 * 60 * 1000; // 3 小时
+			// 恢复到用户建议的 30 分钟。
+			const cooldownMs = 30 * 60 * 1000; // 30 分钟
 			
 			if (elapsed >= cooldownMs) {
 				return { canPost: true };
@@ -1165,6 +1119,10 @@ export class YiMoltAgent {
 		}
 	}
 
+	/**
+	 * 使用多阶段生成管道生成新帖子
+	 * 并在冷却时间结束后发布
+	 */
 	async createOriginalPost(submolt = 'general'): Promise<Post | null> {
 		// 冷却检查统一由 heartbeat 的 checkApiCooldown() 负责，这里不再重复检查
 
